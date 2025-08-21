@@ -1,11 +1,15 @@
 import asyncio
 import json
 import logging
+import os
 import socket
 import re
 import secrets
 import time
 from aiohttp import web, WSMsgType
+
+# module logger
+logger = logging.getLogger(__name__)
 
 
 async def websocket_handler(request):
@@ -46,29 +50,33 @@ async def websocket_handler(request):
 
     try:
         peer_ip = request.remote
-    except Exception:
+    except Exception as e:
+        logger.debug('unable to read request.remote: %s', e)
         peer_ip = None
     if not peer_ip:
         try:
             peer = request.transport.get_extra_info('peername')
             if isinstance(peer, tuple) and len(peer) >= 1:
                 peer_ip = peer[0]
-        except Exception:
+        except Exception as e:
+            logger.debug('unable to get peername: %s', e)
             peer_ip = None
     try:
         async for msg in ws:
             if msg.type == WSMsgType.TEXT:
                 try:
                     data = json.loads(msg.data)
-                except Exception:
+                except Exception as e:
+                    logger.warning('failed to parse JSON from %s: %s', peer_ip, e)
+                    # ignore malformed client messages
                     continue
                 if data.get('type') == 'join':
                     allowed, retry = allow_action(request.app, peer_ip, cost=1)
                     if not allowed:
                         try:
                             await ws.send_str(json.dumps({'type': 'rate_limited', 'retry_after': retry}))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.info('failed to send rate_limited to %s: %s', peer_ip, e)
                         continue
                     raw_name = (data.get('username') or 'Anonymous')
                     # sanitize username
@@ -93,8 +101,8 @@ async def websocket_handler(request):
                             # refuse join
                             try:
                                 await ws.send_str(json.dumps({'type': 'too_many_logins', 'limit': 3}))
-                            except Exception:
-                                pass
+                            except Exception as e:
+                                logger.info('failed to send too_many_logins to %s: %s', peer_ip, e)
                             continue
 
                     # ensure uniqueness among active users
@@ -112,22 +120,33 @@ async def websocket_handler(request):
                     ws._username = username
                     ws._ip = peer_ip
                     usernames.add(username)
+                    # maintain a mapping of username -> ip for clients to consume
+                    user_map = request.app.setdefault('user_map', {})
+                    user_map[username] = peer_ip
                     # increment per-ip count
                     if peer_ip:
                         ip_counts[peer_ip] = ip_counts.get(peer_ip, 0) + 1
                     # Tell the joining client their final assigned name
                     try:
                         await ws.send_str(json.dumps({'type': 'welcome', 'username': username}))
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.info('failed to send welcome to %s (user=%s): %s', peer_ip, username, e)
                     await broadcast(request.app, {'type': 'join', 'from': username, 'ip': peer_ip})
+                    # Broadcast the current users list after a successful join so clients can render it
+                    try:
+                        usernames_now = request.app.get('usernames', set())
+                        user_map = request.app.get('user_map', {})
+                        users = [{'name': n, 'ip': user_map.get(n)} for n in sorted(usernames_now)]
+                        await broadcast(request.app, {'type': 'users', 'users': users})
+                    except Exception:
+                        logger.exception('failed to broadcast users list after join')
                 elif data.get('type') == 'message':
                     allowed, retry = allow_action(request.app, peer_ip, cost=1)
                     if not allowed:
                         try:
                             await ws.send_str(json.dumps({'type': 'rate_limited', 'retry_after': retry}))
-                        except Exception:
-                            pass
+                        except Exception as e:
+                            logger.info('failed to send rate_limited to %s: %s', peer_ip, e)
                         continue
                     text = data.get('text', '') or ''
                     # basic sanitization server-side: remove null bytes and limit length
@@ -135,21 +154,40 @@ async def websocket_handler(request):
                         # remove control characters except common whitespace
                         cleaned = ''.join(ch for ch in text if ch == '\n' or ch == '\t' or (32 <= ord(ch) <= 0x10FFFF))
                     except Exception:
+                        logger.exception('error cleaning message from %s', peer_ip)
                         cleaned = text
                     max_len = 2000
                     if len(cleaned) > max_len:
                         cleaned = cleaned[:max_len]
                     await broadcast(request.app, {'type': 'message', 'from': username or 'Anonymous', 'ip': peer_ip, 'text': cleaned})
             elif msg.type == WSMsgType.ERROR:
-                logging.error('WebSocket connection closed with exception %s', ws.exception())
+                logger.error('WebSocket connection closed with exception %s', ws.exception())
     finally:
         request.app['clients'].discard(ws)
         if username:
             try:
                 request.app.get('usernames', set()).discard(username)
-            except Exception:
-                pass
+                # decrement per-ip connection count to avoid leaking
+                ip = getattr(ws, '_ip', None)
+                if ip:
+                    ip_counts = request.app.setdefault('ip_counts', {})
+                    if ip in ip_counts:
+                        ip_counts[ip] = ip_counts.get(ip, 1) - 1
+                        if ip_counts[ip] <= 0:
+                            ip_counts.pop(ip, None)
+            except Exception as e:
+                logger.exception('error removing username %s from set: %s', username, e)
             await broadcast(request.app, {'type': 'leave', 'from': username, 'ip': getattr(ws, '_ip', None)})
+            # Broadcast updated users list so clients can refresh the online panel
+            try:
+                usernames_now = request.app.get('usernames', set())
+                user_map = request.app.get('user_map', {})
+                # remove mapping for the leaving user to avoid stale entries
+                user_map.pop(username, None)
+                users = [{'name': n, 'ip': user_map.get(n)} for n in sorted(usernames_now)]
+                await broadcast(request.app, {'type': 'users', 'users': users})
+            except Exception:
+                logger.exception('failed to broadcast users list after leave')
     return ws
 
 
@@ -162,23 +200,84 @@ async def broadcast(app, message):
             continue
         try:
             await ws.send_str(data)
-        except Exception:
+        except Exception as e:
+            # if a send fails, log and schedule removal of that websocket
+            logger.exception('failed to send message to client (will remove): %s', e)
             to_remove.append(ws)
     for ws in to_remove:
         app['clients'].discard(ws)
 
 
 async def index(request):
-    resp = web.FileResponse('./static/index.html')
+    # serve the static/index.html using a path relative to this file
+    here = os.path.dirname(__file__)
+    path = os.path.join(here, 'static', 'index.html')
+    resp = web.FileResponse(path)
     # add a few safe headers
     resp.headers['X-Content-Type-Options'] = 'nosniff'
     resp.headers['X-Frame-Options'] = 'DENY'
     return resp
 
 
+async def _periodic_cleanup(app):
+    """Background task to prune closed websockets and stale rate buckets."""
+    try:
+        while True:
+            await asyncio.sleep(60)
+            # remove closed websockets
+            for ws in list(app.get('clients', set())):
+                if getattr(ws, 'closed', False):
+                    app['clients'].discard(ws)
+
+            # prune rate buckets that haven't been updated in a while
+            now = time.time()
+            buckets = app.get('rate_buckets', {})
+            for ip, b in list(buckets.items()):
+                # use the stored timestamp 'ts' as last seen
+                if now - b.get('ts', now) > 600:
+                    buckets.pop(ip, None)
+            # keep the dict back on the app
+            app['rate_buckets'] = buckets
+    except asyncio.CancelledError:
+        # expected on shutdown
+        return
+
+
+async def on_startup(app):
+    # start cleanup task
+    app['cleanup_task'] = asyncio.create_task(_periodic_cleanup(app))
+
+
+async def on_cleanup(app):
+    # cancel background task
+    t = app.pop('cleanup_task', None)
+    if t:
+        t.cancel()
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+    # close all connected websockets
+    for ws in list(app.get('clients', set())):
+        try:
+            await ws.close(code=1001, message=b'Server shutdown')
+        except Exception:
+            pass
+
+
 def main():
+    # basic console logging configuration
+    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    logging.basicConfig(
+        level=getattr(logging, log_level, logging.INFO),
+        format='%(asctime)s %(levelname)-5s %(name)s: %(message)s',
+    )
+
     app = web.Application()
     app['clients'] = set()
+    # register startup/cleanup hooks for background tasks and graceful shutdown
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
     app.add_routes([
         web.get('/', index),
         web.get('/ws', websocket_handler),

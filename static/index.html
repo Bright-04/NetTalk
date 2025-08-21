@@ -3,7 +3,7 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width,initial-scale=1" />
-		<title>LAN Terminal Chat</title>
+		<title>Terminal Chat</title>
 		<style>
 			html,
 			body {
@@ -28,14 +28,63 @@
 				white-space: pre-wrap;
 				word-break: break-word; /* allow long words/URLs to wrap */
 			}
+			#users-panel {
+				position: absolute;
+				top: 12px;
+				right: 12px;
+				background: rgba(0,0,0,0.6);
+				border: 1px solid #333;
+				color: #b6f36b;
+				padding: 8px;
+				font-family: inherit;
+				font-size: 13px;
+				max-width: 240px;
+				max-height: 60vh;
+				overflow: auto;
+				box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+			}
+			#users-panel h4 {
+				margin: 0 0 6px 0;
+				font-size: 12px;
+				color: #6ef;
+			}
+			#users-panel ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+			#users-panel li {
+				padding: 2px 0;
+				border-bottom: 1px dashed rgba(255,255,255,0.03);
+				font-size: 12px;
+			}
 			.input-row {
 				display: flex;
 				gap: 8px;
 				margin-top: 8px;
 			}
 			#prompt {
-				min-width: 90px;
+				display: none;
+				min-width: 0;
 				color: #6ef;
+			}
+			/* distinct style when asking for display name */
+			#prompt.name-mode {
+				display: inline-block;
+				background: #071;
+				border: 1px solid #264;
+				color: #b6f36b;
+				padding: 4px 8px;
+				border-radius: 4px;
+				font-weight: 700;
+			}
+
+			/* input appearance when entering name to make it clearly different */
+			#cmd.name-input {
+				background: #011;
+				border: 1px solid #234;
+				color: #b6f36b;
+				font-weight: 600;
 			}
 			#cmd {
 				flex: 1;
@@ -72,8 +121,10 @@
 	</head>
 	<body>
 		<div class="wrap">
-			<div id="terminal"></div>
-			<div class="input-row">
+				<div id="terminal"></div>
+				<!-- users panel: small, terminal-styled list of online users -->
+				<div id="users-panel" aria-live="polite"></div>
+				<div class="input-row">
 				<div id="prompt">you@lan</div>
 				<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
 			</div>
@@ -93,6 +144,41 @@
 				terminal.scrollTop = terminal.scrollHeight;
 			}
 
+			// users panel helpers
+			const usersPanel = document.getElementById('users-panel');
+			function renderUsersList(users) {
+				// users: array of {name, ip}
+				if (!usersPanel) return;
+				usersPanel.innerHTML = '';
+				const h = document.createElement('h4');
+				h.appendChild(textNode('Online users'));
+				usersPanel.appendChild(h);
+				const ul = document.createElement('ul');
+				users.forEach(u => {
+					const li = document.createElement('li');
+					const nameLabel = u.name || 'Unknown';
+					// name span with per-user color
+					const nameSpan = document.createElement('span');
+					nameSpan.textContent = nameLabel;
+					nameSpan.style.color = colorForName(nameLabel);
+					li.appendChild(nameSpan);
+					if (u.ip) {
+						const ipEl = document.createElement('span');
+						ipEl.className = 'ip';
+						ipEl.textContent = ' [' + u.ip + ']';
+						li.appendChild(ipEl);
+					}
+					if (u.name === username) {
+						const you = document.createElement('span');
+						you.textContent = ' (you)';
+						you.className = 'meta';
+						li.appendChild(you);
+					}
+					ul.appendChild(li);
+				});
+				usersPanel.appendChild(ul);
+			}
+
 			function textNode(text) {
 				return document.createTextNode(text);
 			}
@@ -106,113 +192,202 @@
 
 			function nameNode(name) {
 				const s = document.createElement("span");
-				s.className = "from";
 				s.appendChild(textNode(name));
+				s.className = "from";
+				// apply deterministic color per username for consistent display
+				s.style.color = colorForName(name);
 				return s;
 			}
 
-			function ipNode(ip) {
-				const s = document.createElement("span");
-				s.className = "ip";
-				s.appendChild(textNode(ip));
-				return s;
+			// Deterministic color generator based on a simple hash of the name.
+			// Produces readable HSL colors on dark backgrounds.
+			function colorForName(name) {
+				if (!name) return '#b6f36b';
+				// djb2 hash
+				let hash = 5381;
+				for (let i = 0; i < name.length; i++) {
+					hash = ((hash << 5) + hash) + name.charCodeAt(i);
+					// keep in 32-bit range
+					hash = hash & 0xffffffff;
+				}
+				const hue = Math.abs(hash) % 360;
+				const saturation = 60; // percent
+				const lightness = 60; // percent - bright enough on dark bg
+				// use comma-separated HSL syntax for broader browser compatibility
+				return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 			}
 
-			function appendMetaText(text) {
-				appendLineNode([metaNode(text)]);
-			}
-
-			function rateNode(text) {
-				const span = document.createElement("span");
-				span.className = "meta rate";
-				span.appendChild(textNode(text));
+			function messageTextNode(name, text) {
+				const span = document.createElement('span');
+				span.textContent = text;
+				// keep punctuation/meta parts slightly dimmer by using the same hue but lower lightness
+				try {
+					span.style.color = colorForName(name);
+				} catch (e) {
+					span.style.color = '#b6f36b';
+				}
 				return span;
 			}
 
-			function appendRateNotice(text) {
-				appendLineNode([rateNode(text)]);
-			}
+				function ipNode(ip) {
+					const s = document.createElement("span");
+					s.className = "ip";
+					// render with surrounding brackets and a leading space so it reads
+					// like: "You [192.168.1.23]"
+					s.appendChild(textNode(" [" + ip + "]"));
+					return s;
+				}
 
-			function timeNow() {
-				const d = new Date();
-				return d.toLocaleTimeString();
-			}
+				function appendMetaText(text) {
+					appendLineNode([metaNode(text)]);
+				}
 
-			async function start() {
-				username = prompt("Enter display name", "") || "You";
-				document.getElementById("prompt").textContent = username + "@lan";
+				function rateNode(text) {
+					const span = document.createElement("span");
+					span.className = "meta rate";
+					span.appendChild(textNode(text));
+					return span;
+				}
 
-				const proto = location.protocol === "https:" ? "wss" : "ws";
-				const wsUrl = proto + "://" + location.host + "/ws";
-				const ws = new WebSocket(wsUrl);
+				function appendRateNotice(text) {
+					appendLineNode([rateNode(text)]);
+				}
 
-				ws.addEventListener("open", () => {
-					appendMetaText("[connected to server]");
-					ws.send(JSON.stringify({ type: "join", username }));
-				});
+				function timeNow() {
+					const d = new Date();
+					return d.toLocaleTimeString();
+				}
 
-				ws.addEventListener("message", (ev) => {
-					try {
-						const m = JSON.parse(ev.data);
-						if (m.type === "welcome") {
-							// server assigned/cleaned username
-							username = m.username || username;
-							document.getElementById("prompt").textContent = username + "@lan";
-							return;
-						}
-						if (m.type === "rate_limited") {
-							const retry = m.retry_after || 1;
-							appendRateNotice(`[rate-limited] slow down — retry in ${retry}s`);
-							return;
-						}
+				// WebSocket with reconnect/backoff
+				(function () {
+					// Use an in-terminal prompt instead of browser modal prompt()
+					let awaitingName = true;
+					// show the prompt area visually and set placeholder to ask for name
+					const promptEl = document.getElementById("prompt");
+					// visually switch to name-entry mode (no literal 'enter name@lan' text)
+					promptEl.classList.add('name-mode');
+					promptEl.textContent = '';
+					cmd.classList.add('name-input');
+					cmd.placeholder = 'Enter display name and press Enter';
+					cmd.focus();
 
-						if (m.type === "too_many_logins") {
-							appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
-							return;
-						}
+					const proto = location.protocol === "https:" ? "wss" : "ws";
+					const wsUrl = proto + "://" + location.host + "/ws";
 
-						if (m.type === "join") {
-							const time = "[" + timeNow() + "] ";
-							const nodes = [metaNode(time), nameNode(m.from)];
-							if (m.ip) nodes.push(ipNode(m.ip));
-							nodes.push(textNode(" joined the chat"));
-							appendLineNode(nodes);
-						} else if (m.type === "leave") {
-							const time = "[" + timeNow() + "] ";
-							const nodes = [metaNode(time), nameNode(m.from)];
-							if (m.ip) nodes.push(ipNode(m.ip));
-							nodes.push(textNode(" left"));
-							appendLineNode(nodes);
-						} else if (m.type === "message") {
-							const nodes = [nameNode(m.from)];
-							if (m.ip) nodes.push(ipNode(m.ip));
-							nodes.push(textNode(": " + (m.text || "")));
-							nodes.push(textNode(" "));
-							const t = document.createElement("span");
-							t.className = "time";
-							t.appendChild(textNode(timeNow()));
-							nodes.push(t);
-							appendLineNode(nodes);
-						}
-					} catch (e) {
-						console.error(e);
+					let ws = null;
+					let backoff = 1;
+					let maxBackoff = 30;
+
+					function connect() {
+						ws = new WebSocket(wsUrl);
+
+						ws.addEventListener("open", () => {
+							appendMetaText("[connected to server]");
+							backoff = 1;
+							try {
+								ws.send(JSON.stringify({ type: "join", username }));
+							} catch (e) {
+								console.error('join send failed', e);
+							}
+						});
+
+						ws.addEventListener("message", (ev) => {
+							try {
+								const m = JSON.parse(ev.data);
+								if (m.type === "welcome") {
+									username = m.username || username;
+									document.getElementById("prompt").textContent = username + "@lan";
+									return;
+								}
+								if (m.type === 'users' && Array.isArray(m.users)) {
+									// update users panel with the authoritative list from server
+									renderUsersList(m.users);
+									return;
+								}
+								if (m.type === "rate_limited") {
+									const retry = m.retry_after || 1;
+									appendRateNotice(`[rate-limited] slow down \u2014 retry in ${retry}s`);
+									return;
+								}
+								if (m.type === "too_many_logins") {
+									appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
+									return;
+								}
+								if (m.type === "join") {
+									const time = "[" + timeNow() + "] ";
+									const nodes = [metaNode(time), nameNode(m.from)];
+									if (m.ip) nodes.push(ipNode(m.ip));
+									nodes.push(textNode(" joined the chat"));
+									appendLineNode(nodes);
+								} else if (m.type === "leave") {
+									const time = "[" + timeNow() + "] ";
+									const nodes = [metaNode(time), nameNode(m.from)];
+									if (m.ip) nodes.push(ipNode(m.ip));
+									nodes.push(textNode(" left"));
+									appendLineNode(nodes);
+								} else if (m.type === "message") {
+									const time = "[" + timeNow() + "] ";
+									// show timestamp first (like join/leave)
+									const nodes = [metaNode(time), nameNode(m.from)];
+									if (m.ip) nodes.push(ipNode(m.ip));
+									// message text should use the same color as the sender
+									nodes.push(messageTextNode(m.from, ": " + (m.text || "")));
+									appendLineNode(nodes);
+								}
+							} catch (e) {
+								console.error(e);
+							}
+						});
+
+						ws.addEventListener("close", (ev) => {
+							appendMetaText("[disconnected]");
+							scheduleReconnect();
+						});
+						ws.addEventListener("error", (ev) => {
+							appendMetaText("[connection error]");
+						});
 					}
-				});
 
-				ws.addEventListener("close", () => appendMetaText("[disconnected]"));
-				ws.addEventListener("error", () => appendMetaText("[connection error]"));
+					function scheduleReconnect() {
+						const wait = Math.min(backoff, maxBackoff);
+						appendMetaText(`[reconnecting in ${wait}s]`);
+						setTimeout(() => {
+							backoff = Math.min(maxBackoff, backoff * 1.8 + 1);
+							// connect() will be started after the user submits a name
+						}, wait * 1000);
+					}
 
-				cmd.addEventListener("keydown", (e) => {
-					if (e.key === "Enter") {
+					cmd.addEventListener("keydown", (e) => {
+						if (e.key !== 'Enter') return;
 						const text = cmd.value.trim();
 						if (!text) return;
-						ws.send(JSON.stringify({ type: "message", text }));
-						cmd.value = "";
-					}
-				});
-			}
-
-			start();
+						// If we're awaiting the initial name, treat this as the join name
+						if (typeof awaitingName !== 'undefined' && awaitingName) {
+							username = text || 'You';
+							// remove name-entry visual mode and show normal prompt
+							promptEl.classList.remove('name-mode');
+							promptEl.textContent = username + '@lan';
+							cmd.classList.remove('name-input');
+							cmd.placeholder = 'Type message and press Enter';
+							cmd.value = '';
+							awaitingName = false;
+							// now start the websocket connection
+							connect();
+							return;
+						}
+						// Normal message send flow
+						try {
+							if (ws && ws.readyState === WebSocket.OPEN) {
+								ws.send(JSON.stringify({ type: 'message', text }));
+							} else {
+								appendRateNotice('[offline] message queued temporarily');
+							}
+						} catch (err) {
+							console.error('send failed', err);
+						}
+						cmd.value = '';
+					});
+				})();
 		</script>
 	</body>
 </html>
