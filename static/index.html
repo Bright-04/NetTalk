@@ -28,6 +28,36 @@
 				white-space: pre-wrap;
 				word-break: break-word; /* allow long words/URLs to wrap */
 			}
+			#users-panel {
+				position: absolute;
+				top: 12px;
+				right: 12px;
+				background: rgba(0,0,0,0.6);
+				border: 1px solid #333;
+				color: #b6f36b;
+				padding: 8px;
+				font-family: inherit;
+				font-size: 13px;
+				max-width: 240px;
+				max-height: 60vh;
+				overflow: auto;
+				box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+			}
+			#users-panel h4 {
+				margin: 0 0 6px 0;
+				font-size: 12px;
+				color: #6ef;
+			}
+			#users-panel ul {
+				list-style: none;
+				padding: 0;
+				margin: 0;
+			}
+			#users-panel li {
+				padding: 2px 0;
+				border-bottom: 1px dashed rgba(255,255,255,0.03);
+				font-size: 12px;
+			}
 			.input-row {
 				display: flex;
 				gap: 8px;
@@ -73,8 +103,10 @@
 	</head>
 	<body>
 		<div class="wrap">
-			<div id="terminal"></div>
-			<div class="input-row">
+				<div id="terminal"></div>
+				<!-- users panel: small, terminal-styled list of online users -->
+				<div id="users-panel" aria-live="polite"></div>
+				<div class="input-row">
 				<div id="prompt">you@lan</div>
 				<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
 			</div>
@@ -92,6 +124,23 @@
 				children.forEach((node) => div.appendChild(node));
 				terminal.appendChild(div);
 				terminal.scrollTop = terminal.scrollHeight;
+			}
+
+			// users panel helpers
+			const usersPanel = document.getElementById('users-panel');
+			function renderUsersList(users) {
+				if (!usersPanel) return;
+				usersPanel.innerHTML = '';
+				const h = document.createElement('h4');
+				h.appendChild(textNode('Online users'));
+				usersPanel.appendChild(h);
+				const ul = document.createElement('ul');
+				users.forEach(u => {
+					const li = document.createElement('li');
+					li.textContent = u === username ? u + ' (you)' : u;
+					ul.appendChild(li);
+				});
+				usersPanel.appendChild(ul);
 			}
 
 			function textNode(text) {
@@ -172,6 +221,11 @@
 								if (m.type === "welcome") {
 									username = m.username || username;
 									document.getElementById("prompt").textContent = username + "@lan";
+									return;
+								}
+								if (m.type === 'users' && Array.isArray(m.users)) {
+									// update users panel with the authoritative list from server
+									renderUsersList(m.users);
 									return;
 								}
 								if (m.type === "rate_limited") {

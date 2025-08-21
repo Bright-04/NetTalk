@@ -129,6 +129,12 @@ async def websocket_handler(request):
                     except Exception as e:
                         logger.info('failed to send welcome to %s (user=%s): %s', peer_ip, username, e)
                     await broadcast(request.app, {'type': 'join', 'from': username, 'ip': peer_ip})
+                    # Broadcast the current users list after a successful join so clients can render it
+                    try:
+                        users = sorted(list(request.app.get('usernames', set())))
+                        await broadcast(request.app, {'type': 'users', 'users': users})
+                    except Exception:
+                        logger.exception('failed to broadcast users list after join')
                 elif data.get('type') == 'message':
                     allowed, retry = allow_action(request.app, peer_ip, cost=1)
                     if not allowed:
@@ -167,6 +173,12 @@ async def websocket_handler(request):
             except Exception as e:
                 logger.exception('error removing username %s from set: %s', username, e)
             await broadcast(request.app, {'type': 'leave', 'from': username, 'ip': getattr(ws, '_ip', None)})
+            # Broadcast updated users list so clients can refresh the online panel
+            try:
+                users = sorted(list(request.app.get('usernames', set())))
+                await broadcast(request.app, {'type': 'users', 'users': users})
+            except Exception:
+                logger.exception('failed to broadcast users list after leave')
     return ws
 
 
