@@ -1,6 +1,6 @@
-# NetTalk — LAN Terminal Chat
+# NetTalk - LAN Terminal Chat
 
-LAN Terminal Chat — a minimal terminal-style chat UI you can host on a LAN.
+LAN Terminal Chat - a minimal terminal-style chat UI you can host on a LAN.
 
 Features
 
@@ -15,10 +15,6 @@ Requirements
 Quick start (Windows PowerShell)
 
 1. Open PowerShell and change to the project folder:
-
-    ```powershell
-    cd "D:\IT Study (2024 - 2025)\NetTalk"
-    ```
 
 2. Create and activate a venv (recommended) and install dependencies, or use the helper script:
 
@@ -56,15 +52,10 @@ Configuration
 
 - Port: edit `server.py` (variable `port`).
 
-Next steps
+License & attribution
 
-- Add message persistence/history
-- Add authentication for private groups
-
-License
-
-This project is provided under the MIT license (see `LICENSE`).
+- This project is provided under the MIT license (see `LICENSE`).
 
 ---
 
-Small, pragmatic, and focused — designed for a single host on your office LAN.
+Small, pragmatic, and focused - designed for a single host on your office LAN.
