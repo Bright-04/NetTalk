@@ -81,8 +81,8 @@
 			let username = "";
 
 			// DOM-safe helpers
-			function appendLineNode(children, className = 'line') {
-				const div = document.createElement('div');
+			function appendLineNode(children, className = "line") {
+				const div = document.createElement("div");
 				div.className = className;
 				children.forEach((node) => div.appendChild(node));
 				terminal.appendChild(div);
@@ -94,22 +94,22 @@
 			}
 
 			function metaNode(text) {
-				const span = document.createElement('span');
-				span.className = 'meta';
+				const span = document.createElement("span");
+				span.className = "meta";
 				span.appendChild(textNode(text));
 				return span;
 			}
 
 			function nameNode(name) {
-				const s = document.createElement('span');
-				s.className = 'from';
+				const s = document.createElement("span");
+				s.className = "from";
 				s.appendChild(textNode(name));
 				return s;
 			}
 
 			function ipNode(ip) {
-				const s = document.createElement('span');
-				s.className = 'ip';
+				const s = document.createElement("span");
+				s.className = "ip";
 				s.appendChild(textNode(ip));
 				return s;
 			}
@@ -132,13 +132,19 @@
 				const ws = new WebSocket(wsUrl);
 
 				ws.addEventListener("open", () => {
-					appendMetaText('[connected to server]');
+					appendMetaText("[connected to server]");
 					ws.send(JSON.stringify({ type: "join", username }));
 				});
 
 				ws.addEventListener("message", (ev) => {
 					try {
 						const m = JSON.parse(ev.data);
+						if (m.type === "welcome") {
+							// server assigned/cleaned username
+							username = m.username || username;
+							document.getElementById("prompt").textContent = username + "@lan";
+							return;
+						}
 						if (m.type === "join") {
 							const time = "[" + timeNow() + "] ";
 							const nodes = [metaNode(time), nameNode(m.from)];
@@ -167,8 +173,8 @@
 					}
 				});
 
-				ws.addEventListener("close", () => appendMetaText('[disconnected]'));
-				ws.addEventListener("error", () => appendMetaText('[connection error]'));
+				ws.addEventListener("close", () => appendMetaText("[disconnected]"));
+				ws.addEventListener("error", () => appendMetaText("[connection error]"));
 
 				cmd.addEventListener("keydown", (e) => {
 					if (e.key === "Enter") {

@@ -2,6 +2,8 @@ import asyncio
 import json
 import logging
 import socket
+import re
+import secrets
 from aiohttp import web, WSMsgType
 
 
@@ -31,9 +33,41 @@ async def websocket_handler(request):
                 except Exception:
                     continue
                 if data.get('type') == 'join':
-                    username = data.get('username', 'Anonymous')
+                    raw_name = (data.get('username') or 'Anonymous')
+                    # sanitize username
+                    def sanitize_name(n):
+                        # remove control chars
+                        n = ''.join(ch for ch in n if ch == '\t' or ch == '\n' or (32 <= ord(ch) <= 0x10FFFF))
+                        n = n.strip()
+                        # allow only these chars
+                        n = re.sub(r"[^A-Za-z0-9 _\-]", "", n)
+                        if not n:
+                            n = 'User' + format(secrets.randbelow(10000), '04d')
+                        if len(n) > 32:
+                            n = n[:32]
+                        return n
+
+                    clean_name = sanitize_name(raw_name)
+                    # ensure uniqueness among active users
+                    base = clean_name
+                    suffix = 1
+                    usernames = request.app.setdefault('usernames', set())
+                    while clean_name in usernames:
+                        suffix += 1
+                        clean_name = f"{base}-{suffix}"
+                        if len(clean_name) > 32:
+                            # truncate keeping suffix
+                            clean_name = clean_name[:28] + f"-{suffix}"
+
+                    username = clean_name
                     ws._username = username
                     ws._ip = peer_ip
+                    usernames.add(username)
+                    # Tell the joining client their final assigned name
+                    try:
+                        await ws.send_str(json.dumps({'type': 'welcome', 'username': username}))
+                    except Exception:
+                        pass
                     await broadcast(request.app, {'type': 'join', 'from': username, 'ip': peer_ip})
                 elif data.get('type') == 'message':
                     text = data.get('text', '') or ''
@@ -52,6 +86,10 @@ async def websocket_handler(request):
     finally:
         request.app['clients'].discard(ws)
         if username:
+            try:
+                request.app.get('usernames', set()).discard(username)
+            except Exception:
+                pass
             await broadcast(request.app, {'type': 'leave', 'from': username, 'ip': getattr(ws, '_ip', None)})
     return ws
 
