@@ -156,6 +156,14 @@ async def websocket_handler(request):
         if username:
             try:
                 request.app.get('usernames', set()).discard(username)
+                # decrement per-ip connection count to avoid leaking
+                ip = getattr(ws, '_ip', None)
+                if ip:
+                    ip_counts = request.app.setdefault('ip_counts', {})
+                    if ip in ip_counts:
+                        ip_counts[ip] = ip_counts.get(ip, 1) - 1
+                        if ip_counts[ip] <= 0:
+                            ip_counts.pop(ip, None)
             except Exception as e:
                 logger.exception('error removing username %s from set: %s', username, e)
             await broadcast(request.app, {'type': 'leave', 'from': username, 'ip': getattr(ws, '_ip', None)})
@@ -246,6 +254,9 @@ def main():
 
     app = web.Application()
     app['clients'] = set()
+    # register startup/cleanup hooks for background tasks and graceful shutdown
+    app.on_startup.append(on_startup)
+    app.on_cleanup.append(on_cleanup)
     app.add_routes([
         web.get('/', index),
         web.get('/ws', websocket_handler),

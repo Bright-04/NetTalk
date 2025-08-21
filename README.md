@@ -44,6 +44,12 @@ python -m pip install -r requirements.txt
 python server.py
 ```
 
+Alternatively use the included helper which creates a venv and installs deps:
+
+```powershell
+.\run.ps1
+```
+
 The server prints a recommended LAN URL (for example `http://192.168.0.115:8765`). Open that URL in other machines on the same network.
 
 Firewall
