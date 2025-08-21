@@ -68,6 +68,24 @@
 				min-width: 0;
 				color: #6ef;
 			}
+			/* distinct style when asking for display name */
+			#prompt.name-mode {
+				display: inline-block;
+				background: #071;
+				border: 1px solid #264;
+				color: #b6f36b;
+				padding: 4px 8px;
+				border-radius: 4px;
+				font-weight: 700;
+			}
+
+			/* input appearance when entering name to make it clearly different */
+			#cmd.name-input {
+				background: #011;
+				border: 1px solid #234;
+				color: #b6f36b;
+				font-weight: 600;
+			}
 			#cmd {
 				flex: 1;
 				background: #000;
@@ -198,10 +216,12 @@
 				(function () {
 					// Use an in-terminal prompt instead of browser modal prompt()
 					let awaitingName = true;
-					// show the prompt area and set placeholder to ask for name
+					// show the prompt area visually and set placeholder to ask for name
 					const promptEl = document.getElementById("prompt");
-					promptEl.style.display = 'block';
-					promptEl.textContent = 'enter name@lan';
+					// visually switch to name-entry mode (no literal 'enter name@lan' text)
+					promptEl.classList.add('name-mode');
+					promptEl.textContent = '';
+					cmd.classList.add('name-input');
 					cmd.placeholder = 'Enter display name and press Enter';
 					cmd.focus();
 
@@ -297,7 +317,10 @@
 						// If we're awaiting the initial name, treat this as the join name
 						if (typeof awaitingName !== 'undefined' && awaitingName) {
 							username = text || 'You';
-							document.getElementById('prompt').textContent = username + '@lan';
+							// remove name-entry visual mode and show normal prompt
+							promptEl.classList.remove('name-mode');
+							promptEl.textContent = username + '@lan';
+							cmd.classList.remove('name-input');
 							cmd.placeholder = 'Type message and press Enter';
 							cmd.value = '';
 							awaitingName = false;
