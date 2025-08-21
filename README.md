@@ -13,10 +13,6 @@ Quick start (Windows PowerShell)
 
 1. Open PowerShell and change to the project folder:
 
-```powershell
-cd "D:\IT Study (2024 - 2025)\NetTalk"
-```
-
 2. Create and activate a venv (recommended) and install dependencies:
 
 ```powershell
