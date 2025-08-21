@@ -36,8 +36,17 @@ async def websocket_handler(request):
                     ws._ip = peer_ip
                     await broadcast(request.app, {'type': 'join', 'from': username, 'ip': peer_ip})
                 elif data.get('type') == 'message':
-                    text = data.get('text', '')
-                    await broadcast(request.app, {'type': 'message', 'from': username or 'Anonymous', 'ip': peer_ip, 'text': text})
+                    text = data.get('text', '') or ''
+                    # basic sanitization server-side: remove null bytes and limit length
+                    try:
+                        # remove control characters except common whitespace
+                        cleaned = ''.join(ch for ch in text if ch == '\n' or ch == '\t' or (32 <= ord(ch) <= 0x10FFFF))
+                    except Exception:
+                        cleaned = text
+                    max_len = 2000
+                    if len(cleaned) > max_len:
+                        cleaned = cleaned[:max_len]
+                    await broadcast(request.app, {'type': 'message', 'from': username or 'Anonymous', 'ip': peer_ip, 'text': cleaned})
             elif msg.type == WSMsgType.ERROR:
                 logging.error('WebSocket connection closed with exception %s', ws.exception())
     finally:
@@ -63,7 +72,11 @@ async def broadcast(app, message):
 
 
 async def index(request):
-    return web.FileResponse('./static/index.html')
+    resp = web.FileResponse('./static/index.html')
+    # add a few safe headers
+    resp.headers['X-Content-Type-Options'] = 'nosniff'
+    resp.headers['X-Frame-Options'] = 'DENY'
+    return resp
 
 
 def main():
