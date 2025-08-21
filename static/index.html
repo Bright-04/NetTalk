@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<title>LAN Terminal Chat</title>
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+			}
+			body {
+				background: #000;
+				color: #b6f36b;
+				font-family: Menlo, Consolas, monospace;
+			}
+			.wrap {
+				display: flex;
+				flex-direction: column;
+				height: 100vh;
+				padding: 10px;
+				box-sizing: border-box;
+			}
+			#terminal {
+				flex: 1;
+				overflow: auto;
+				white-space: pre-wrap;
+			}
+			.input-row {
+				display: flex;
+				gap: 8px;
+				margin-top: 8px;
+			}
+			#prompt {
+				min-width: 90px;
+				color: #6ef;
+			}
+			#cmd {
+				flex: 1;
+				background: #000;
+				border: 1px solid #333;
+				color: inherit;
+				padding: 6px;
+				font-family: inherit;
+				font-size: 14px;
+			}
+			.meta {
+				color: #888;
+				font-size: 12px;
+			}
+			.line .from {
+				color: #6ef;
+			}
+			.line .time {
+				color: #777;
+				margin-left: 6px;
+				font-size: 12px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="wrap">
+			<div id="terminal"></div>
+			<div class="input-row">
+				<div id="prompt">you@lan</div>
+				<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
+			</div>
+		</div>
+
+		<script>
+			const terminal = document.getElementById("terminal");
+			const cmd = document.getElementById("cmd");
+			let username = "";
+
+			function appendLine(html) {
+				const div = document.createElement("div");
+				div.className = "line";
+				div.innerHTML = html;
+				terminal.appendChild(div);
+				terminal.scrollTop = terminal.scrollHeight;
+			}
+
+			function timeNow() {
+				const d = new Date();
+				return d.toLocaleTimeString();
+			}
+
+			async function start() {
+				username = prompt("Enter display name", "") || "You";
+				document.getElementById("prompt").textContent = username + "@lan";
+
+				const proto = location.protocol === "https:" ? "wss" : "ws";
+				const wsUrl = proto + "://" + location.host + "/ws";
+				const ws = new WebSocket(wsUrl);
+
+				ws.addEventListener("open", () => {
+					appendLine('<span class="meta">[connected to server]</span>');
+					ws.send(JSON.stringify({ type: "join", username }));
+				});
+
+				ws.addEventListener("message", (ev) => {
+					try {
+						const m = JSON.parse(ev.data);
+						if (m.type === "join") {
+							appendLine(`<span class="meta">[${timeNow()}] <span class="from">${m.from}</span> joined the chat</span>`);
+						} else if (m.type === "leave") {
+							appendLine(`<span class="meta">[${timeNow()}] <span class="from">${m.from}</span> left</span>`);
+						} else if (m.type === "message") {
+							const safeText = (m.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+							appendLine(`<span class="from">${m.from}</span>: ${safeText} <span class="time">${timeNow()}</span>`);
+						}
+					} catch (e) {
+						console.error(e);
+					}
+				});
+
+				ws.addEventListener("close", () => appendLine('<span class="meta">[disconnected]</span>'));
+				ws.addEventListener("error", () => appendLine('<span class="meta">[connection error]</span>'));
+
+				cmd.addEventListener("keydown", (e) => {
+					if (e.key === "Enter") {
+						const text = cmd.value.trim();
+						if (!text) return;
+						ws.send(JSON.stringify({ type: "message", text }));
+						cmd.value = "";
+					}
+				});
+			}
+
+			start();
+		</script>
+	</body>
+</html>
