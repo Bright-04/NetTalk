@@ -50,6 +50,10 @@
 				color: #888;
 				font-size: 12px;
 			}
+			.meta.rate {
+				color: #f66; /* red-ish */
+				font-weight: 600;
+			}
 			.line .from {
 				color: #6ef;
 				white-space: nowrap;
@@ -118,6 +122,17 @@
 				appendLineNode([metaNode(text)]);
 			}
 
+			function rateNode(text) {
+				const span = document.createElement("span");
+				span.className = "meta rate";
+				span.appendChild(textNode(text));
+				return span;
+			}
+
+			function appendRateNotice(text) {
+				appendLineNode([rateNode(text)]);
+			}
+
 			function timeNow() {
 				const d = new Date();
 				return d.toLocaleTimeString();
@@ -145,6 +160,12 @@
 							document.getElementById("prompt").textContent = username + "@lan";
 							return;
 						}
+						if (m.type === "rate_limited") {
+							const retry = m.retry_after || 1;
+							appendRateNotice(`[rate-limited] slow down — retry in ${retry}s`);
+							return;
+						}
+
 						if (m.type === "join") {
 							const time = "[" + timeNow() + "] ";
 							const nodes = [metaNode(time), nameNode(m.from)];

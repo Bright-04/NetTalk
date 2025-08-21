@@ -4,6 +4,7 @@ import logging
 import socket
 import re
 import secrets
+import time
 from aiohttp import web, WSMsgType
 
 
@@ -14,6 +15,35 @@ async def websocket_handler(request):
     username = None
     # determine peer ip for this websocket connection
     peer_ip = None
+    # helper: token-bucket rate limiter
+    def allow_action(app, ip, cost=1):
+        if not ip:
+            return True, 0
+        buckets = app.setdefault('rate_buckets', {})
+        now = time.time()
+        # config
+        capacity = 8
+        refill_per_sec = 1.0
+        b = buckets.get(ip)
+        if b is None:
+            b = {'tokens': capacity, 'ts': now}
+        # refill
+        elapsed = now - b['ts']
+        if elapsed > 0:
+            add = elapsed * refill_per_sec
+            b['tokens'] = min(capacity, b['tokens'] + add)
+            b['ts'] = now
+        if b['tokens'] >= cost:
+            b['tokens'] -= cost
+            buckets[ip] = b
+            return True, 0
+        else:
+            # calculate retry-after seconds
+            needed = cost - b['tokens']
+            retry_after = int((needed / refill_per_sec) + 1)
+            buckets[ip] = b
+            return False, retry_after
+
     try:
         peer_ip = request.remote
     except Exception:
@@ -33,6 +63,13 @@ async def websocket_handler(request):
                 except Exception:
                     continue
                 if data.get('type') == 'join':
+                    allowed, retry = allow_action(request.app, peer_ip, cost=1)
+                    if not allowed:
+                        try:
+                            await ws.send_str(json.dumps({'type': 'rate_limited', 'retry_after': retry}))
+                        except Exception:
+                            pass
+                        continue
                     raw_name = (data.get('username') or 'Anonymous')
                     # sanitize username
                     def sanitize_name(n):
@@ -70,6 +107,13 @@ async def websocket_handler(request):
                         pass
                     await broadcast(request.app, {'type': 'join', 'from': username, 'ip': peer_ip})
                 elif data.get('type') == 'message':
+                    allowed, retry = allow_action(request.app, peer_ip, cost=1)
+                    if not allowed:
+                        try:
+                            await ws.send_str(json.dumps({'type': 'rate_limited', 'retry_after': retry}))
+                        except Exception:
+                            pass
+                        continue
                     text = data.get('text', '') or ''
                     # basic sanitization server-side: remove null bytes and limit length
                     try:
