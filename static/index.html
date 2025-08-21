@@ -82,6 +82,32 @@
 				font-weight: 700;
 			}
 
+			/* quote shown at the top while entering display name */
+			.name-quote-top {
+				display: none;
+				position: absolute;
+				top: 18px;
+				left: 18px; /* align left per request */
+				transform: none;
+				max-width: calc(100% - 36px);
+				color: #9ad0ff;
+				font-style: italic;
+				font-size: 15px;
+				border-left: 4px solid rgba(106, 192, 255, 0.18);
+				padding-left: 12px;
+				padding-top: 6px;
+				padding-bottom: 6px;
+				background: rgba(0,0,0,0.35);
+				backdrop-filter: blur(2px);
+				border-radius: 6px;
+				z-index: 20;
+			}
+
+			/* visible when prompt is in name-mode */
+			.name-quote-top.visible {
+				display: block;
+			}
+
 			/* input appearance when entering name to make it clearly different */
 			#cmd.name-input {
 				background: #011;
@@ -124,13 +150,15 @@
 	</head>
 	<body>
 		<div class="wrap">
-				<div id="terminal"></div>
-				<!-- users panel: small, terminal-styled list of online users -->
-				<div id="users-panel" aria-live="polite"></div>
-				<div class="input-row">
-				<div id="prompt">you@lan</div>
-				<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
-			</div>
+					<!-- quote shown when entering display name (top of UI) -->
+					<div id="name-quote-top" class="name-quote-top" aria-hidden="true"></div>
+					<div id="terminal"></div>
+					<!-- users panel: small, terminal-styled list of online users -->
+					<div id="users-panel" aria-live="polite"></div>
+					<div class="input-row">
+						<div id="prompt">you@lan</div>
+						<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
+					</div>
 		</div>
 
 		<script>
@@ -273,6 +301,78 @@
 					cmd.classList.add('name-input');
 					cmd.placeholder = 'Enter display name and press Enter';
 					cmd.focus();
+
+					// Typing quote logic: word-by-word typing at the top
+					const quoteEl = document.getElementById('name-quote-top');
+					const quotes = [
+						"Wake up, Neo...",
+						"I know you're out there. I can feel you now. I know that you're afraid. You're afraid of us. You're afraid of change."
+					];
+					let quoteIndex = 0;
+					let quoteWords = [];
+					let typingTimer = null;
+					let currentIndex = 0;
+
+					function startTyping() {
+						if (!quoteEl) return;
+						quoteEl.classList.add('visible');
+						// begin with the first quote
+						quoteIndex = 0;
+						startQuote(quoteIndex);
+					}
+
+					function startQuote(i) {
+						if (!quoteEl) return;
+						quoteEl.textContent = '';
+						quoteWords = quotes[i].split(/\s+/);
+						currentIndex = 0;
+						step();
+					}
+
+					function stopTyping() {
+						if (!quoteEl) return;
+						quoteEl.classList.remove('visible');
+						quoteEl.textContent = '';
+						if (typingTimer) {
+							clearTimeout(typingTimer);
+							typingTimer = null;
+						}
+					}
+
+					function step() {
+						if (currentIndex >= quoteWords.length) {
+							// finished current quote
+							typingTimer = null;
+							quoteIndex++;
+							if (quoteIndex < quotes.length) {
+								// pause then start next quote
+								typingTimer = setTimeout(() => startQuote(quoteIndex), 900);
+							} else {
+								// all quotes done; keep displayed until name entered
+							}
+							return;
+						}
+						const w = quoteWords[currentIndex];
+						quoteEl.textContent += (currentIndex ? ' ' : '') + w;
+						currentIndex++;
+						// variable delay: slightly longer after punctuation
+						let delay = 220 + Math.floor(Math.random() * 80);
+						if (/[.!?]$/.test(w)) delay += 260;
+						typingTimer = setTimeout(step, delay);
+					}
+
+					// Observe class changes on the prompt to start/stop typing
+					const obs = new MutationObserver((mutations) => {
+						for (const m of mutations) {
+							if (m.type === 'attributes' && m.attributeName === 'class') {
+								const has = promptEl.classList.contains('name-mode');
+								if (has) startTyping(); else stopTyping();
+							}
+						}
+					});
+					obs.observe(promptEl, { attributes: true });
+					// start immediately if name-mode already present
+					if (promptEl.classList.contains('name-mode')) startTyping();
 
 					const proto = location.protocol === "https:" ? "wss" : "ws";
 					const wsUrl = proto + "://" + location.host + "/ws";
