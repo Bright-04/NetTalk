@@ -196,8 +196,14 @@
 
 				// WebSocket with reconnect/backoff
 				(function () {
-					username = prompt("Enter display name", "") || "You";
-					document.getElementById("prompt").textContent = username + "@lan";
+					// Use an in-terminal prompt instead of browser modal prompt()
+					let awaitingName = true;
+					// show the prompt area and set placeholder to ask for name
+					const promptEl = document.getElementById("prompt");
+					promptEl.style.display = 'block';
+					promptEl.textContent = 'enter name@lan';
+					cmd.placeholder = 'Enter display name and press Enter';
+					cmd.focus();
 
 					const proto = location.protocol === "https:" ? "wss" : "ws";
 					const wsUrl = proto + "://" + location.host + "/ws";
@@ -280,28 +286,37 @@
 						appendMetaText(`[reconnecting in ${wait}s]`);
 						setTimeout(() => {
 							backoff = Math.min(maxBackoff, backoff * 1.8 + 1);
-							connect();
+							// connect() will be started after the user submits a name
 						}, wait * 1000);
 					}
 
 					cmd.addEventListener("keydown", (e) => {
-						if (e.key === "Enter") {
-							const text = cmd.value.trim();
-							if (!text) return;
-							try {
-								if (ws && ws.readyState === WebSocket.OPEN) {
-									ws.send(JSON.stringify({ type: "message", text }));
-								} else {
-									appendRateNotice('[offline] message queued temporarily');
-								}
-							} catch (err) {
-								console.error('send failed', err);
-							}
-							cmd.value = "";
+						if (e.key !== 'Enter') return;
+						const text = cmd.value.trim();
+						if (!text) return;
+						// If we're awaiting the initial name, treat this as the join name
+						if (typeof awaitingName !== 'undefined' && awaitingName) {
+							username = text || 'You';
+							document.getElementById('prompt').textContent = username + '@lan';
+							cmd.placeholder = 'Type message and press Enter';
+							cmd.value = '';
+							awaitingName = false;
+							// now start the websocket connection
+							connect();
+							return;
 						}
+						// Normal message send flow
+						try {
+							if (ws && ws.readyState === WebSocket.OPEN) {
+								ws.send(JSON.stringify({ type: 'message', text }));
+							} else {
+								appendRateNotice('[offline] message queued temporarily');
+							}
+						} catch (err) {
+							console.error('send failed', err);
+						}
+						cmd.value = '';
 					});
-
-					connect();
 				})();
 		</script>
 	</body>
