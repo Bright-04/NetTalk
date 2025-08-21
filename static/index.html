@@ -26,6 +26,7 @@
 				flex: 1;
 				overflow: auto;
 				white-space: pre-wrap;
+				word-break: break-word; /* allow long words/URLs to wrap */
 			}
 			.input-row {
 				display: flex;
@@ -49,8 +50,18 @@
 				color: #888;
 				font-size: 12px;
 			}
+			.meta.rate {
+				color: #f66; /* red-ish */
+				font-weight: 600;
+			}
 			.line .from {
 				color: #6ef;
+				white-space: nowrap;
+			}
+			.line .ip {
+				color: #8fb;
+				margin-left: 6px;
+				font-size: 12px;
 			}
 			.line .time {
 				color: #777;
@@ -73,12 +84,53 @@
 			const cmd = document.getElementById("cmd");
 			let username = "";
 
-			function appendLine(html) {
+			// DOM-safe helpers
+			function appendLineNode(children, className = "line") {
 				const div = document.createElement("div");
-				div.className = "line";
-				div.innerHTML = html;
+				div.className = className;
+				children.forEach((node) => div.appendChild(node));
 				terminal.appendChild(div);
 				terminal.scrollTop = terminal.scrollHeight;
+			}
+
+			function textNode(text) {
+				return document.createTextNode(text);
+			}
+
+			function metaNode(text) {
+				const span = document.createElement("span");
+				span.className = "meta";
+				span.appendChild(textNode(text));
+				return span;
+			}
+
+			function nameNode(name) {
+				const s = document.createElement("span");
+				s.className = "from";
+				s.appendChild(textNode(name));
+				return s;
+			}
+
+			function ipNode(ip) {
+				const s = document.createElement("span");
+				s.className = "ip";
+				s.appendChild(textNode(ip));
+				return s;
+			}
+
+			function appendMetaText(text) {
+				appendLineNode([metaNode(text)]);
+			}
+
+			function rateNode(text) {
+				const span = document.createElement("span");
+				span.className = "meta rate";
+				span.appendChild(textNode(text));
+				return span;
+			}
+
+			function appendRateNotice(text) {
+				appendLineNode([rateNode(text)]);
 			}
 
 			function timeNow() {
@@ -95,28 +147,60 @@
 				const ws = new WebSocket(wsUrl);
 
 				ws.addEventListener("open", () => {
-					appendLine('<span class="meta">[connected to server]</span>');
+					appendMetaText("[connected to server]");
 					ws.send(JSON.stringify({ type: "join", username }));
 				});
 
 				ws.addEventListener("message", (ev) => {
 					try {
 						const m = JSON.parse(ev.data);
+						if (m.type === "welcome") {
+							// server assigned/cleaned username
+							username = m.username || username;
+							document.getElementById("prompt").textContent = username + "@lan";
+							return;
+						}
+						if (m.type === "rate_limited") {
+							const retry = m.retry_after || 1;
+							appendRateNotice(`[rate-limited] slow down — retry in ${retry}s`);
+							return;
+						}
+
+						if (m.type === "too_many_logins") {
+							appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
+							return;
+						}
+
 						if (m.type === "join") {
-							appendLine(`<span class="meta">[${timeNow()}] <span class="from">${m.from}</span> joined the chat</span>`);
+							const time = "[" + timeNow() + "] ";
+							const nodes = [metaNode(time), nameNode(m.from)];
+							if (m.ip) nodes.push(ipNode(m.ip));
+							nodes.push(textNode(" joined the chat"));
+							appendLineNode(nodes);
 						} else if (m.type === "leave") {
-							appendLine(`<span class="meta">[${timeNow()}] <span class="from">${m.from}</span> left</span>`);
+							const time = "[" + timeNow() + "] ";
+							const nodes = [metaNode(time), nameNode(m.from)];
+							if (m.ip) nodes.push(ipNode(m.ip));
+							nodes.push(textNode(" left"));
+							appendLineNode(nodes);
 						} else if (m.type === "message") {
-							const safeText = (m.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-							appendLine(`<span class="from">${m.from}</span>: ${safeText} <span class="time">${timeNow()}</span>`);
+							const nodes = [nameNode(m.from)];
+							if (m.ip) nodes.push(ipNode(m.ip));
+							nodes.push(textNode(": " + (m.text || "")));
+							nodes.push(textNode(" "));
+							const t = document.createElement("span");
+							t.className = "time";
+							t.appendChild(textNode(timeNow()));
+							nodes.push(t);
+							appendLineNode(nodes);
 						}
 					} catch (e) {
 						console.error(e);
 					}
 				});
 
-				ws.addEventListener("close", () => appendLine('<span class="meta">[disconnected]</span>'));
-				ws.addEventListener("error", () => appendLine('<span class="meta">[connection error]</span>'));
+				ws.addEventListener("close", () => appendMetaText("[disconnected]"));
+				ws.addEventListener("error", () => appendMetaText("[connection error]"));
 
 				cmd.addEventListener("keydown", (e) => {
 					if (e.key === "Enter") {
