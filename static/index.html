@@ -156,10 +156,24 @@
 				const ul = document.createElement('ul');
 				users.forEach(u => {
 					const li = document.createElement('li');
-					let label = u.name || 'Unknown';
-					if (u.ip) label += ' [' + u.ip + ']';
-					if (u.name === username) label += ' (you)';
-					li.textContent = label;
+					const nameLabel = u.name || 'Unknown';
+					// name span with per-user color
+					const nameSpan = document.createElement('span');
+					nameSpan.textContent = nameLabel;
+					nameSpan.style.color = colorForName(nameLabel);
+					li.appendChild(nameSpan);
+					if (u.ip) {
+						const ipEl = document.createElement('span');
+						ipEl.className = 'ip';
+						ipEl.textContent = ' [' + u.ip + ']';
+						li.appendChild(ipEl);
+					}
+					if (u.name === username) {
+						const you = document.createElement('span');
+						you.textContent = ' (you)';
+						you.className = 'meta';
+						li.appendChild(you);
+					}
 					ul.appendChild(li);
 				});
 				usersPanel.appendChild(ul);
@@ -180,7 +194,39 @@
 				const s = document.createElement("span");
 				s.appendChild(textNode(name));
 				s.className = "from";
+				// apply deterministic color per username for consistent display
+				s.style.color = colorForName(name);
 				return s;
+			}
+
+			// Deterministic color generator based on a simple hash of the name.
+			// Produces readable HSL colors on dark backgrounds.
+			function colorForName(name) {
+				if (!name) return '#b6f36b';
+				// djb2 hash
+				let hash = 5381;
+				for (let i = 0; i < name.length; i++) {
+					hash = ((hash << 5) + hash) + name.charCodeAt(i);
+					// keep in 32-bit range
+					hash = hash & 0xffffffff;
+				}
+				const hue = Math.abs(hash) % 360;
+				const saturation = 60; // percent
+				const lightness = 60; // percent - bright enough on dark bg
+				// use comma-separated HSL syntax for broader browser compatibility
+				return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+			}
+
+			function messageTextNode(name, text) {
+				const span = document.createElement('span');
+				span.textContent = text;
+				// keep punctuation/meta parts slightly dimmer by using the same hue but lower lightness
+				try {
+					span.style.color = colorForName(name);
+				} catch (e) {
+					span.style.color = '#b6f36b';
+				}
+				return span;
 			}
 
 				function ipNode(ip) {
@@ -284,7 +330,8 @@
 									// show timestamp first (like join/leave)
 									const nodes = [metaNode(time), nameNode(m.from)];
 									if (m.ip) nodes.push(ipNode(m.ip));
-									nodes.push(textNode(": " + (m.text || "")));
+									// message text should use the same color as the sender
+									nodes.push(messageTextNode(m.from, ": " + (m.text || "")));
 									appendLineNode(nodes);
 								}
 							} catch (e) {
