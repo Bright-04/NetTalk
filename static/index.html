@@ -129,6 +129,7 @@
 			// users panel helpers
 			const usersPanel = document.getElementById('users-panel');
 			function renderUsersList(users) {
+				// users: array of {name, ip}
 				if (!usersPanel) return;
 				usersPanel.innerHTML = '';
 				const h = document.createElement('h4');
@@ -137,7 +138,10 @@
 				const ul = document.createElement('ul');
 				users.forEach(u => {
 					const li = document.createElement('li');
-					li.textContent = u === username ? u + ' (you)' : u;
+					let label = u.name || 'Unknown';
+					if (u.ip) label += ' [' + u.ip + ']';
+					if (u.name === username) label += ' (you)';
+					li.textContent = label;
 					ul.appendChild(li);
 				});
 				usersPanel.appendChild(ul);

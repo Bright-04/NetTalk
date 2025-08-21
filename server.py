@@ -120,6 +120,9 @@ async def websocket_handler(request):
                     ws._username = username
                     ws._ip = peer_ip
                     usernames.add(username)
+                    # maintain a mapping of username -> ip for clients to consume
+                    user_map = request.app.setdefault('user_map', {})
+                    user_map[username] = peer_ip
                     # increment per-ip count
                     if peer_ip:
                         ip_counts[peer_ip] = ip_counts.get(peer_ip, 0) + 1
@@ -131,7 +134,9 @@ async def websocket_handler(request):
                     await broadcast(request.app, {'type': 'join', 'from': username, 'ip': peer_ip})
                     # Broadcast the current users list after a successful join so clients can render it
                     try:
-                        users = sorted(list(request.app.get('usernames', set())))
+                        usernames_now = request.app.get('usernames', set())
+                        user_map = request.app.get('user_map', {})
+                        users = [{'name': n, 'ip': user_map.get(n)} for n in sorted(usernames_now)]
                         await broadcast(request.app, {'type': 'users', 'users': users})
                     except Exception:
                         logger.exception('failed to broadcast users list after join')
@@ -175,7 +180,11 @@ async def websocket_handler(request):
             await broadcast(request.app, {'type': 'leave', 'from': username, 'ip': getattr(ws, '_ip', None)})
             # Broadcast updated users list so clients can refresh the online panel
             try:
-                users = sorted(list(request.app.get('usernames', set())))
+                usernames_now = request.app.get('usernames', set())
+                user_map = request.app.get('user_map', {})
+                # remove mapping for the leaving user to avoid stale entries
+                user_map.pop(username, None)
+                users = [{'name': n, 'ip': user_map.get(n)} for n in sorted(usernames_now)]
                 await broadcast(request.app, {'type': 'users', 'users': users})
             except Exception:
                 logger.exception('failed to broadcast users list after leave')
