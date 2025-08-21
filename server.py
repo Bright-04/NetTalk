@@ -180,11 +180,60 @@ async def broadcast(app, message):
 
 
 async def index(request):
-    resp = web.FileResponse('./static/index.html')
+    # serve the static/index.html using a path relative to this file
+    here = os.path.dirname(__file__)
+    path = os.path.join(here, 'static', 'index.html')
+    resp = web.FileResponse(path)
     # add a few safe headers
     resp.headers['X-Content-Type-Options'] = 'nosniff'
     resp.headers['X-Frame-Options'] = 'DENY'
     return resp
+
+
+async def _periodic_cleanup(app):
+    """Background task to prune closed websockets and stale rate buckets."""
+    try:
+        while True:
+            await asyncio.sleep(60)
+            # remove closed websockets
+            for ws in list(app.get('clients', set())):
+                if getattr(ws, 'closed', False):
+                    app['clients'].discard(ws)
+
+            # prune rate buckets that haven't been updated in a while
+            now = time.time()
+            buckets = app.get('rate_buckets', {})
+            for ip, b in list(buckets.items()):
+                # use the stored timestamp 'ts' as last seen
+                if now - b.get('ts', now) > 600:
+                    buckets.pop(ip, None)
+            # keep the dict back on the app
+            app['rate_buckets'] = buckets
+    except asyncio.CancelledError:
+        # expected on shutdown
+        return
+
+
+async def on_startup(app):
+    # start cleanup task
+    app['cleanup_task'] = asyncio.create_task(_periodic_cleanup(app))
+
+
+async def on_cleanup(app):
+    # cancel background task
+    t = app.pop('cleanup_task', None)
+    if t:
+        t.cancel()
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+    # close all connected websockets
+    for ws in list(app.get('clients', set())):
+        try:
+            await ws.close(code=1001, message=b'Server shutdown')
+        except Exception:
+            pass
 
 
 def main():

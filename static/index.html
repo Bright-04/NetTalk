@@ -106,113 +106,144 @@
 
 			function nameNode(name) {
 				const s = document.createElement("span");
-				s.className = "from";
 				s.appendChild(textNode(name));
+				s.className = "from";
 				return s;
 			}
 
-			function ipNode(ip) {
-				const s = document.createElement("span");
-				s.className = "ip";
-				s.appendChild(textNode(ip));
-				return s;
-			}
+				function ipNode(ip) {
+					const s = document.createElement("span");
+					s.className = "ip";
+					// render with surrounding brackets and a leading space so it reads
+					// like: "You [192.168.1.23]"
+					s.appendChild(textNode(" [" + ip + "]"));
+					return s;
+				}
 
-			function appendMetaText(text) {
-				appendLineNode([metaNode(text)]);
-			}
+				function appendMetaText(text) {
+					appendLineNode([metaNode(text)]);
+				}
 
-			function rateNode(text) {
-				const span = document.createElement("span");
-				span.className = "meta rate";
-				span.appendChild(textNode(text));
-				return span;
-			}
+				function rateNode(text) {
+					const span = document.createElement("span");
+					span.className = "meta rate";
+					span.appendChild(textNode(text));
+					return span;
+				}
 
-			function appendRateNotice(text) {
-				appendLineNode([rateNode(text)]);
-			}
+				function appendRateNotice(text) {
+					appendLineNode([rateNode(text)]);
+				}
 
-			function timeNow() {
-				const d = new Date();
-				return d.toLocaleTimeString();
-			}
+				function timeNow() {
+					const d = new Date();
+					return d.toLocaleTimeString();
+				}
 
-			async function start() {
-				username = prompt("Enter display name", "") || "You";
-				document.getElementById("prompt").textContent = username + "@lan";
+				// WebSocket with reconnect/backoff
+				(function () {
+					username = prompt("Enter display name", "") || "You";
+					document.getElementById("prompt").textContent = username + "@lan";
 
-				const proto = location.protocol === "https:" ? "wss" : "ws";
-				const wsUrl = proto + "://" + location.host + "/ws";
-				const ws = new WebSocket(wsUrl);
+					const proto = location.protocol === "https:" ? "wss" : "ws";
+					const wsUrl = proto + "://" + location.host + "/ws";
 
-				ws.addEventListener("open", () => {
-					appendMetaText("[connected to server]");
-					ws.send(JSON.stringify({ type: "join", username }));
-				});
+					let ws = null;
+					let backoff = 1;
+					let maxBackoff = 30;
 
-				ws.addEventListener("message", (ev) => {
-					try {
-						const m = JSON.parse(ev.data);
-						if (m.type === "welcome") {
-							// server assigned/cleaned username
-							username = m.username || username;
-							document.getElementById("prompt").textContent = username + "@lan";
-							return;
-						}
-						if (m.type === "rate_limited") {
-							const retry = m.retry_after || 1;
-							appendRateNotice(`[rate-limited] slow down — retry in ${retry}s`);
-							return;
-						}
+					function connect() {
+						ws = new WebSocket(wsUrl);
 
-						if (m.type === "too_many_logins") {
-							appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
-							return;
-						}
+						ws.addEventListener("open", () => {
+							appendMetaText("[connected to server]");
+							backoff = 1;
+							try {
+								ws.send(JSON.stringify({ type: "join", username }));
+							} catch (e) {
+								console.error('join send failed', e);
+							}
+						});
 
-						if (m.type === "join") {
-							const time = "[" + timeNow() + "] ";
-							const nodes = [metaNode(time), nameNode(m.from)];
-							if (m.ip) nodes.push(ipNode(m.ip));
-							nodes.push(textNode(" joined the chat"));
-							appendLineNode(nodes);
-						} else if (m.type === "leave") {
-							const time = "[" + timeNow() + "] ";
-							const nodes = [metaNode(time), nameNode(m.from)];
-							if (m.ip) nodes.push(ipNode(m.ip));
-							nodes.push(textNode(" left"));
-							appendLineNode(nodes);
-						} else if (m.type === "message") {
-							const nodes = [nameNode(m.from)];
-							if (m.ip) nodes.push(ipNode(m.ip));
-							nodes.push(textNode(": " + (m.text || "")));
-							nodes.push(textNode(" "));
-							const t = document.createElement("span");
-							t.className = "time";
-							t.appendChild(textNode(timeNow()));
-							nodes.push(t);
-							appendLineNode(nodes);
-						}
-					} catch (e) {
-						console.error(e);
+						ws.addEventListener("message", (ev) => {
+							try {
+								const m = JSON.parse(ev.data);
+								if (m.type === "welcome") {
+									username = m.username || username;
+									document.getElementById("prompt").textContent = username + "@lan";
+									return;
+								}
+								if (m.type === "rate_limited") {
+									const retry = m.retry_after || 1;
+									appendRateNotice(`[rate-limited] slow down \u2014 retry in ${retry}s`);
+									return;
+								}
+								if (m.type === "too_many_logins") {
+									appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
+									return;
+								}
+								if (m.type === "join") {
+									const time = "[" + timeNow() + "] ";
+									const nodes = [metaNode(time), nameNode(m.from)];
+									if (m.ip) nodes.push(ipNode(m.ip));
+									nodes.push(textNode(" joined the chat"));
+									appendLineNode(nodes);
+								} else if (m.type === "leave") {
+									const time = "[" + timeNow() + "] ";
+									const nodes = [metaNode(time), nameNode(m.from)];
+									if (m.ip) nodes.push(ipNode(m.ip));
+									nodes.push(textNode(" left"));
+									appendLineNode(nodes);
+								} else if (m.type === "message") {
+									const time = "[" + timeNow() + "] ";
+									// show timestamp first (like join/leave)
+									const nodes = [metaNode(time), nameNode(m.from)];
+									if (m.ip) nodes.push(ipNode(m.ip));
+									nodes.push(textNode(": " + (m.text || "")));
+									appendLineNode(nodes);
+								}
+							} catch (e) {
+								console.error(e);
+							}
+						});
+
+						ws.addEventListener("close", (ev) => {
+							appendMetaText("[disconnected]");
+							scheduleReconnect();
+						});
+						ws.addEventListener("error", (ev) => {
+							appendMetaText("[connection error]");
+						});
 					}
-				});
 
-				ws.addEventListener("close", () => appendMetaText("[disconnected]"));
-				ws.addEventListener("error", () => appendMetaText("[connection error]"));
-
-				cmd.addEventListener("keydown", (e) => {
-					if (e.key === "Enter") {
-						const text = cmd.value.trim();
-						if (!text) return;
-						ws.send(JSON.stringify({ type: "message", text }));
-						cmd.value = "";
+					function scheduleReconnect() {
+						const wait = Math.min(backoff, maxBackoff);
+						appendMetaText(`[reconnecting in ${wait}s]`);
+						setTimeout(() => {
+							backoff = Math.min(maxBackoff, backoff * 1.8 + 1);
+							connect();
+						}, wait * 1000);
 					}
-				});
-			}
 
-			start();
+					cmd.addEventListener("keydown", (e) => {
+						if (e.key === "Enter") {
+							const text = cmd.value.trim();
+							if (!text) return;
+							try {
+								if (ws && ws.readyState === WebSocket.OPEN) {
+									ws.send(JSON.stringify({ type: "message", text }));
+								} else {
+									appendRateNotice('[offline] message queued temporarily');
+								}
+							} catch (err) {
+								console.error('send failed', err);
+							}
+							cmd.value = "";
+						}
+					});
+
+					connect();
+				})();
 		</script>
 	</body>
 </html>

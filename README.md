@@ -5,6 +5,7 @@ This minimal app hosts a simple terminal-like chat UI on your PC. Other users on
 Requirements
 
 -   Python 3.8+
+ -   Python 3.11+ recommended (some dependencies and a modern asyncio/event loop behaviour work best on 3.11+)
 
 Windows (PowerShell) quick run
 
@@ -55,6 +56,12 @@ Security notes
 -   Messages are sanitized and rendered with DOM-safe APIs to prevent XSS.
 -   Simple per-IP token-bucket rate limiting is applied to prevent spam.
 -   Concurrent connections from the same IP are limited (default 3).
+
+Recent improvements
+
+- Graceful server shutdown: the server now closes client websockets on shutdown and cancels background tasks.
+- Background cleanup runs periodically to prune stale websockets and rate-limit buckets.
+- Client-side reconnection/backoff: the web UI now reconnects with an exponential-ish backoff and shows reconnect notices.
 
 Configuration (quick)
 
