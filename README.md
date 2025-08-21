@@ -1,13 +1,3 @@
-LAN Terminal Chat - Quick start
-
-This minimal app hosts a simple terminal-like chat UI on your PC. Other users on the same LAN can open a browser to http://<your-ip>:8765 and chat in real-time.
-
-Requirements
-
--   Python 3.8+
-
-Windows (PowerShell) quick run
-
 # NetTalk — LAN Terminal Chat
 
 A minimal, secure, terminal-style chat server you can host on your PC for small office LAN use (4–5 users).
@@ -65,12 +55,6 @@ Troubleshooting
 
 -   If `aiohttp` fails to install on Python 3.13, use Python 3.11 (recommended) or switch to the Node.js server variant.
 -   For client-side issues: open developer console in the browser and paste any errors back here.
-
-Next steps
-
--   Add message persistence or history
--   Add authentication (optional) for private groups
--   Replace simple rate limits with per-user tokens or CAPTCHAs for stronger anti-abuse
 
 License & attribution
 
