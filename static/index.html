@@ -46,6 +46,22 @@
 				overflow: auto;
 				box-shadow: 0 2px 6px rgba(0,0,0,0.6);
 			}
+
+			/* small toggle button for mobile to open/close users panel */
+			#users-toggle {
+				display: none;
+				position: absolute;
+				top: 12px;
+				right: 12px;
+				background: rgba(255,255,255,0.03);
+				color: #9ad0ff;
+				border: 1px solid rgba(255,255,255,0.03);
+				padding: 6px 8px;
+				border-radius: 6px;
+				font-size: 14px;
+				cursor: pointer;
+				z-index: 30;
+			}
 			#users-panel h4 {
 				margin: 0 0 6px 0;
 				font-size: 12px;
@@ -146,12 +162,35 @@
 				margin-left: 6px;
 				font-size: 12px;
 			}
+
+			/* Responsive: mobile friendly layout */
+			@media (max-width: 760px) {
+				#users-panel { display: none; }
+				#users-toggle { display: block; }
+				/* input row fixed to bottom for easier typing on mobile */
+				.input-row {
+					position: fixed;
+					bottom: 10px;
+					left: 8px;
+					right: 8px;
+					background: rgba(0,0,0,0.5);
+					padding: 8px;
+					border-radius: 8px;
+					backdrop-filter: blur(4px);
+					z-index: 40;
+				}
+				#cmd { font-size: 16px; padding: 10px; }
+				#terminal { padding-bottom: 120px; }
+				/* make the top quote full width-ish on small screens */
+				.name-quote-top { left: 12px; top: 10px; max-width: calc(100% - 24px); font-size: 14px; }
+			}
 		</style>
 	</head>
 	<body>
 		<div class="wrap">
 					<!-- quote shown when entering display name (top of UI) -->
 					<div id="name-quote-top" class="name-quote-top" aria-hidden="true"></div>
+					<button id="users-toggle" aria-expanded="false" aria-controls="users-panel">Users</button>
 					<div id="terminal"></div>
 					<!-- users panel: small, terminal-styled list of online users -->
 					<div id="users-panel" aria-live="polite"></div>
@@ -374,6 +413,33 @@
 					// start immediately if name-mode already present
 					if (promptEl.classList.contains('name-mode')) startTyping();
 
+					// Mobile users panel toggle
+					const usersToggle = document.getElementById('users-toggle');
+					function showUsersPanel(show) {
+						if (show) {
+							document.getElementById('users-panel').style.display = 'block';
+							usersToggle.setAttribute('aria-expanded', 'true');
+						} else {
+							document.getElementById('users-panel').style.display = 'none';
+							usersToggle.setAttribute('aria-expanded', 'false');
+						}
+					}
+					if (usersToggle) {
+						usersToggle.addEventListener('click', () => {
+							const visible = document.getElementById('users-panel').style.display === 'block';
+							showUsersPanel(!visible);
+						});
+						// show panel on larger screens
+						window.addEventListener('resize', () => {
+							if (window.innerWidth > 760) {
+								document.getElementById('users-panel').style.display = 'block';
+								usersToggle.setAttribute('aria-expanded', 'true');
+							} else {
+								document.getElementById('users-panel').style.display = 'none';
+								usersToggle.setAttribute('aria-expanded', 'false');
+							}
+						});
+					}
 					const proto = location.protocol === "https:" ? "wss" : "ws";
 					const wsUrl = proto + "://" + location.host + "/ws";
 
