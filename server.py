@@ -85,6 +85,18 @@ async def websocket_handler(request):
                         return n
 
                     clean_name = sanitize_name(raw_name)
+                    # enforce per-IP concurrent login limit
+                    ip_counts = request.app.setdefault('ip_counts', {})
+                    if peer_ip:
+                        current = ip_counts.get(peer_ip, 0)
+                        if current >= 3:
+                            # refuse join
+                            try:
+                                await ws.send_str(json.dumps({'type': 'too_many_logins', 'limit': 3}))
+                            except Exception:
+                                pass
+                            continue
+
                     # ensure uniqueness among active users
                     base = clean_name
                     suffix = 1
@@ -100,6 +112,9 @@ async def websocket_handler(request):
                     ws._username = username
                     ws._ip = peer_ip
                     usernames.add(username)
+                    # increment per-ip count
+                    if peer_ip:
+                        ip_counts[peer_ip] = ip_counts.get(peer_ip, 0) + 1
                     # Tell the joining client their final assigned name
                     try:
                         await ws.send_str(json.dumps({'type': 'welcome', 'username': username}))

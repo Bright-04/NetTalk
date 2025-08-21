@@ -166,6 +166,11 @@
 							return;
 						}
 
+						if (m.type === "too_many_logins") {
+							appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
+							return;
+						}
+
 						if (m.type === "join") {
 							const time = "[" + timeNow() + "] ";
 							const nodes = [metaNode(time), nameNode(m.from)];
