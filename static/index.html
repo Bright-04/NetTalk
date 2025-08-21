@@ -77,7 +77,6 @@
 				padding: 4px 8px;
 				border-radius: 4px;
 				font-weight: 700;
-				transition: transform 0.35s ease, opacity 0.35s ease;
 			}
 
 			/* input appearance when entering name to make it clearly different */
@@ -86,16 +85,6 @@
 				border: 1px solid #234;
 				color: #b6f36b;
 				font-weight: 600;
-				transition: transform 0.35s ease, opacity 0.35s ease;
- 
-			}
-			#prompt.name-mode.transitioning {
-				transform: translateY(-8px) scale(0.96);
-				opacity: 0;
-			}
-			#cmd.name-input.transitioning {
-				transform: translateY(-4px) scale(0.98);
-				opacity: 0.92;
 			}
 			#cmd {
 				flex: 1;
@@ -328,20 +317,15 @@
 						// If we're awaiting the initial name, treat this as the join name
 						if (typeof awaitingName !== 'undefined' && awaitingName) {
 							username = text || 'You';
-							// start visual transition
-							promptEl.classList.add('transitioning');
-							cmd.classList.add('transitioning');
-							// after animation completes, finalize UI and connect
-							setTimeout(() => {
-								promptEl.classList.remove('name-mode', 'transitioning');
-								promptEl.textContent = username + '@lan';
-								cmd.classList.remove('name-input', 'transitioning');
-								cmd.placeholder = 'Type message and press Enter';
-								cmd.value = '';
-								awaitingName = false;
-								// now start the websocket connection
-								connect();
-							}, 360);
+							// remove name-entry visual mode and show normal prompt
+							promptEl.classList.remove('name-mode');
+							promptEl.textContent = username + '@lan';
+							cmd.classList.remove('name-input');
+							cmd.placeholder = 'Type message and press Enter';
+							cmd.value = '';
+							awaitingName = false;
+							// now start the websocket connection
+							connect();
 							return;
 						}
 						// Normal message send flow
