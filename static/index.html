@@ -26,6 +26,7 @@
 				flex: 1;
 				overflow: auto;
 				white-space: pre-wrap;
+				word-break: break-word; /* allow long words/URLs to wrap */
 			}
 			.input-row {
 				display: flex;
@@ -51,6 +52,12 @@
 			}
 			.line .from {
 				color: #6ef;
+				white-space: nowrap;
+			}
+			.line .ip {
+				color: #8fb;
+				margin-left: 6px;
+				font-size: 12px;
 			}
 			.line .time {
 				color: #777;
@@ -103,12 +110,15 @@
 					try {
 						const m = JSON.parse(ev.data);
 						if (m.type === "join") {
-							appendLine(`<span class="meta">[${timeNow()}] <span class="from">${m.from}</span> joined the chat</span>`);
+							const ip = m.ip ? `<span class=\"ip\">${m.ip}</span>` : "";
+							appendLine(`<span class=\"meta\">[${timeNow()}] <span class=\"from\">${m.from}</span>${ip} joined the chat</span>`);
 						} else if (m.type === "leave") {
-							appendLine(`<span class="meta">[${timeNow()}] <span class="from">${m.from}</span> left</span>`);
+							const ip = m.ip ? `<span class=\"ip\">${m.ip}</span>` : "";
+							appendLine(`<span class=\"meta\">[${timeNow()}] <span class=\"from\">${m.from}</span>${ip} left</span>`);
 						} else if (m.type === "message") {
 							const safeText = (m.text || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-							appendLine(`<span class="from">${m.from}</span>: ${safeText} <span class="time">${timeNow()}</span>`);
+							const ip = m.ip ? `<span class=\"ip\">${m.ip}</span>` : "";
+							appendLine(`<span class=\"from\">${m.from}</span>${ip}: ${safeText} <span class=\"time\">${timeNow()}</span>`);
 						}
 					} catch (e) {
 						console.error(e);
