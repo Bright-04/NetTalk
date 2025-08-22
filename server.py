@@ -84,8 +84,8 @@ async def websocket_handler(request):
                         # remove control chars
                         n = ''.join(ch for ch in n if ch == '\t' or ch == '\n' or (32 <= ord(ch) <= 0x10FFFF))
                         n = n.strip()
-                        # allow only these chars
-                        n = re.sub(r"[^A-Za-z0-9 _\-]", "", n)
+                        # allow Unicode letters, numbers, and common symbols (space, _, -, .)
+                        n = re.sub(r"[^\w \-\.]+", "", n, flags=re.UNICODE)
                         if not n:
                             n = 'User' + format(secrets.randbelow(10000), '04d')
                         if len(n) > 32:
