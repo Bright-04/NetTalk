@@ -148,18 +148,38 @@ async def websocket_handler(request):
                         except Exception as e:
                             logger.info('failed to send rate_limited to %s: %s', peer_ip, e)
                         continue
-                    text = data.get('text', '') or ''
-                    # basic sanitization server-side: remove null bytes and limit length
-                    try:
-                        # remove control characters except common whitespace
-                        cleaned = ''.join(ch for ch in text if ch == '\n' or ch == '\t' or (32 <= ord(ch) <= 0x10FFFF))
-                    except Exception:
-                        logger.exception('error cleaning message from %s', peer_ip)
-                        cleaned = text
-                    max_len = 2000
-                    if len(cleaned) > max_len:
-                        cleaned = cleaned[:max_len]
-                    await broadcast(request.app, {'type': 'message', 'from': username or 'Anonymous', 'ip': peer_ip, 'text': cleaned})
+
+                    # support regular text messages and code snippets (subtype='code')
+                    subtype = data.get('subtype')
+                    if subtype == 'code':
+                        # accept multiline code; sanitize minimally (remove nulls) and cap length
+                        code = data.get('code', '') or ''
+                        try:
+                            cleaned = ''.join(ch for ch in code if ch == '\n' or ch == '\t' or (32 <= ord(ch) <= 0x10FFFF))
+                        except Exception:
+                            logger.exception('error cleaning code message from %s', peer_ip)
+                            cleaned = code
+                        max_len = 8000
+                        if len(cleaned) > max_len:
+                            cleaned = cleaned[:max_len]
+                        payload = {'type': 'message', 'from': username or 'Anonymous', 'ip': peer_ip, 'subtype': 'code', 'code': cleaned}
+                        lang = data.get('lang')
+                        if lang:
+                            payload['lang'] = lang
+                        await broadcast(request.app, payload)
+                    else:
+                        text = data.get('text', '') or ''
+                        # basic sanitization server-side: remove null bytes and limit length
+                        try:
+                            # remove control characters except common whitespace
+                            cleaned = ''.join(ch for ch in text if ch == '\n' or ch == '\t' or (32 <= ord(ch) <= 0x10FFFF))
+                        except Exception:
+                            logger.exception('error cleaning message from %s', peer_ip)
+                            cleaned = text
+                        max_len = 2000
+                        if len(cleaned) > max_len:
+                            cleaned = cleaned[:max_len]
+                        await broadcast(request.app, {'type': 'message', 'from': username or 'Anonymous', 'ip': peer_ip, 'text': cleaned})
             elif msg.type == WSMsgType.ERROR:
                 logger.error('WebSocket connection closed with exception %s', ws.exception())
     finally:
