@@ -168,6 +168,11 @@
 				color: #888;
 				font-size: 12px;
 			}
+			/* notification text (join/leave) */
+			.notice {
+				color: #777; /* slightly dimmer gray for notifications */
+				font-style: italic;
+			}
 			.meta.rate {
 				color: #f66; /* red-ish */
 				font-weight: 600;
@@ -297,6 +302,13 @@
 				} catch (e) {
 					span.style.color = "#b6f36b";
 				}
+				return span;
+			}
+
+			function noticeNode(text) {
+				const span = document.createElement("span");
+				span.className = "notice";
+				span.appendChild(textNode(text));
 				return span;
 			}
 
@@ -458,13 +470,13 @@
 								const time = "[" + timeNow() + "] ";
 								const nodes = [metaNode(time), nameNode(m.from)];
 								if (m.ip) nodes.push(ipNode(m.ip));
-								nodes.push(textNode(" joined the chat"));
+								nodes.push(noticeNode(" joined the chat"));
 								appendLineNode(nodes);
 							} else if (m.type === "leave") {
 								const time = "[" + timeNow() + "] ";
 								const nodes = [metaNode(time), nameNode(m.from)];
 								if (m.ip) nodes.push(ipNode(m.ip));
-								nodes.push(textNode(" left"));
+								nodes.push(noticeNode(" left"));
 								appendLineNode(nodes);
 							} else if (m.type === "message") {
 								const time = "[" + timeNow() + "] ";
