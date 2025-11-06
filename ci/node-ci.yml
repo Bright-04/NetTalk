@@ -1,0 +1,18 @@
+name: Node CI
+
+on: [push, pull_request]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+            - name: Use Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "16"
+            - name: Install dependencies
+              run: npm ci
+            - name: Run basic lint/test (no tests present)
+              run: |
+                  echo "No test suite configured - sanity check only"

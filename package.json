@@ -1,16 +1,23 @@
 {
 	"name": "nettalk",
 	"version": "1.0.0",
-	"description": "NetTalk - LAN Terminal Chat (Node/Express port)",
-	"main": "server.js",
+	"description": "NetTalk - LAN Terminal Chat (Node/Express)",
+	"main": "src/server.js",
 	"scripts": {
-		"start": "node server.js"
+		"start": "node src/server.js",
+		"dev": "nodemon --watch src src/server.js",
+		"lint": "echo \"no linter configured\"",
+		"check": "node -e \"console.log('quick check')\""
 	},
 	"engines": {
 		"node": ">=14"
 	},
 	"dependencies": {
 		"express": "^4.18.2",
+		"pg": "^8.10.0",
 		"ws": "^8.13.0"
+	},
+	"devDependencies": {
+		"nodemon": "^3.1.10"
 	}
 }
