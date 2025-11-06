@@ -34,3 +34,8 @@ dist/
 
 # runtime files
 run.ps1
+
+# Node
+node_modules/
+package-lock.json
+

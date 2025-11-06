@@ -1,0 +1,16 @@
+{
+	"name": "nettalk",
+	"version": "1.0.0",
+	"description": "NetTalk - LAN Terminal Chat (Node/Express port)",
+	"main": "server.js",
+	"scripts": {
+		"start": "node server.js"
+	},
+	"engines": {
+		"node": ">=14"
+	},
+	"dependencies": {
+		"express": "^4.18.2",
+		"ws": "^8.13.0"
+	}
+}

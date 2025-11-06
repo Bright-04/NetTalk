@@ -4,13 +4,13 @@ LAN Terminal Chat - a minimal terminal-style chat UI you can host on a LAN.
 
 Features
 
-- Single Python server that serves a terminal-like web UI
-- WebSocket-based realtime chat (default port 8765)
-- Basic security: server-side username sanitization, DOM-safe rendering, rate-limiting and per-IP connection caps
+-   Single Python server that serves a terminal-like web UI
+-   WebSocket-based realtime chat (default port 8765)
+-   Basic security: server-side username sanitization, DOM-safe rendering, rate-limiting and per-IP connection caps
 
 Requirements
 
-- Python 3.8+ (Python 3.11+ recommended)
+-   Python 3.8+ (Python 3.11+ recommended)
 
 Quick start (Windows PowerShell)
 
@@ -39,22 +39,38 @@ The server prints a recommended LAN URL (for example `http://192.168.0.115:8765`
 
 Troubleshooting
 
-- If `aiohttp` fails to install on Python 3.13, use Python 3.11 (recommended). The included `run.ps1` supports bootstrapping with a different python via the `NETTALK_PYTHON` environment variable.
-- If clients can't connect, add an inbound firewall rule for TCP port 8765 (Private profile recommended).
+-   If `aiohttp` fails to install on Python 3.13, use Python 3.11 (recommended). The included `run.ps1` supports bootstrapping with a different python via the `NETTALK_PYTHON` environment variable.
+-   If clients can't connect, add an inbound firewall rule for TCP port 8765 (Private profile recommended).
+
+Node.js (Express) version
+
+You can run a Node.js + Express port of this server that provides the same WebSocket-based chat behavior.
+
+1. Install Node.js (v14+), then from the project root:
+
+```powershell
+# install dependencies
+npm install
+
+# start the server
+npm start
+```
+
+The Node server listens on the same default port 8765 and serves the same `static/` files.
 
 Recent improvements
 
-- Graceful shutdown: server closes client websockets on shutdown and cancels background tasks.
-- Periodic cleanup task prunes stale websockets and rate-limit buckets.
-- Client-side reconnection/backoff with reconnect notices.
+-   Graceful shutdown: server closes client websockets on shutdown and cancels background tasks.
+-   Periodic cleanup task prunes stale websockets and rate-limit buckets.
+-   Client-side reconnection/backoff with reconnect notices.
 
 Configuration
 
-- Port: edit `server.py` (variable `port`).
+-   Port: edit `server.py` (variable `port`).
 
 License & attribution
 
-- This project is provided under the MIT license (see `LICENSE`).
+-   This project is provided under the MIT license (see `LICENSE`).
 
 ---
 
