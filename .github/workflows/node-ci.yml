@@ -12,7 +12,15 @@ jobs:
               with:
                   node-version: "16"
             - name: Install dependencies
-              run: npm ci
+              run: |
+                  # prefer npm ci for reproducible installs when a lockfile is present
+                  if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+                    echo "Lockfile found, running npm ci"
+                    npm ci
+                  else
+                    echo "No lockfile found, running npm install (will generate a lockfile locally)"
+                    npm install
+                  fi
             - name: Quick smoke
               run: |
                   node -e "console.log('smoke check')"
