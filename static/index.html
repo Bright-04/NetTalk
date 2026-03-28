@@ -3,215 +3,563 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width,initial-scale=1" />
-		<title>Terminal Chat</title>
+		<title>NetTalk | Live LAN Chat</title>
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+			rel="stylesheet"
+		/>
 		<link rel="icon" type="image/svg+xml" href="/static/terminal-favicon.svg" />
-		<!-- PNG fallback for browsers that don't support SVG favicons -->
 		<link
 			rel="icon"
 			type="image/png"
 			href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAQCAYAAAB49l8LAAAACXBIWXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH5QkFAyQ6mJ7ZLQAAAB1pVFh0Q29tbWVudAAAAAAAQ3JlYXRlZCB3aXRoIEdJTVBkLmUHAAAAzElEQVRIx+2WsQ3CMBBF3yQk0gLqgk6g5yFXoTtYg2g2g2k2QY2k3QY2g3LQxGJmXGJ3b3c8z7n3k8B/6oG8u5lQ9xwAAf4Avc8gPB8gWk6q2iw6wIsei0WJmJ9A3gF4wE0wDngM3gJ9gF4wF0wBngM3gJ9gF4wE0wDngM3gJ9gF4wF0wBngM3gJ9gF4wE0wDngM3gJ9gF4wF0wBngM3gJ9j3bA+I6x7jqwqQGmQAAAABJRU5ErkJggg=="
 		/>
 		<style>
+			:root {
+				--bg-deep: #040805;
+				--bg-mid: #06130c;
+				--card: rgba(3, 14, 8, 0.9);
+				--card-border: rgba(121, 241, 146, 0.2);
+				--text-main: #c9ffd4;
+				--text-dim: #6ea87a;
+				--accent-cyan: #72f8ff;
+				--accent-lime: #8dff9f;
+				--accent-amber: #ffd47d;
+				--shadow-soft: 0 12px 30px rgba(0, 0, 0, 0.48);
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
 			html,
 			body {
 				height: 100%;
 				margin: 0;
 			}
+
 			body {
-				background: #000;
-				color: #b6f36b;
-				font-family: Menlo, Consolas, monospace;
+				background:
+					radial-gradient(circle at 12% 15%, #10321e 0%, transparent 34%),
+					radial-gradient(circle at 82% 10%, #0d2b1a 0%, transparent 32%),
+					linear-gradient(145deg, var(--bg-deep) 0%, var(--bg-mid) 100%);
+				color: var(--text-main);
+				font-family: "IBM Plex Mono", Consolas, monospace;
+				overflow: hidden;
 			}
-			.wrap {
+
+			body::before {
+				content: "";
+				position: fixed;
+				inset: 0;
+				pointer-events: none;
+				opacity: 0.18;
+				background-image:
+					linear-gradient(rgba(141, 255, 159, 0.08) 1px, transparent 1px),
+					linear-gradient(90deg, rgba(141, 255, 159, 0.08) 1px, transparent 1px);
+				background-size: 26px 26px;
+			}
+
+			body::after {
+				content: "";
+				position: fixed;
+				inset: 0;
+				pointer-events: none;
+				opacity: 0.07;
+				background: repeating-linear-gradient(180deg, rgba(125, 255, 156, 0.22) 0 1px, transparent 1px 3px);
+			}
+
+			.app-shell {
 				display: flex;
 				flex-direction: column;
-				height: 100vh;
-				padding: 10px;
-				box-sizing: border-box;
+				height: 100%;
+				padding: clamp(16px, 2.8vw, 30px);
+				gap: 12px;
+				position: relative;
+				z-index: 1;
 			}
+
+			.card {
+				border-radius: 10px;
+				border: 1px solid var(--card-border);
+				background: var(--card);
+				backdrop-filter: blur(5px);
+				box-shadow: var(--shadow-soft);
+			}
+
+			.topbar {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				gap: 14px;
+				padding: 12px 16px;
+				background: linear-gradient(130deg, rgba(5, 19, 12, 0.95), rgba(3, 17, 9, 0.82));
+				animation: reveal 420ms ease-out;
+			}
+
+			.brand {
+				display: flex;
+				align-items: baseline;
+				gap: 10px;
+			}
+
+			.brand h1 {
+				margin: 0;
+				font-family: "IBM Plex Mono", Consolas, monospace;
+				font-size: clamp(1.1rem, 1.45vw, 1.38rem);
+				letter-spacing: 0.08em;
+				font-weight: 700;
+				text-transform: uppercase;
+				text-shadow: 0 0 8px rgba(141, 255, 159, 0.22);
+			}
+
+			.brand .tagline {
+				font-size: 0.78rem;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--text-dim);
+			}
+
+			.connection-pill {
+				display: inline-flex;
+				align-items: center;
+				gap: 8px;
+				padding: 7px 10px;
+				border: 1px solid rgba(141, 255, 159, 0.32);
+				border-radius: 999px;
+				background: rgba(4, 19, 10, 0.62);
+				font-size: 0.78rem;
+				white-space: nowrap;
+			}
+
+			.connection-dot {
+				width: 9px;
+				height: 9px;
+				border-radius: 50%;
+				background: #7f927f;
+				box-shadow: 0 0 0 0 rgba(127, 146, 127, 0.5);
+			}
+
+			.connection-dot.live {
+				background: var(--accent-lime);
+				box-shadow: 0 0 0 0 rgba(200, 255, 138, 0.6);
+				animation: pulse 1.9s infinite;
+			}
+
+			.connection-dot.waiting {
+				background: var(--accent-amber);
+			}
+
+			.landing-panel {
+				display: none;
+				position: relative;
+				max-width: 100%;
+				color: #b7ffc4;
+				font-size: 0.86rem;
+				line-height: 1.5;
+				border-left: 3px solid rgba(141, 255, 159, 0.45);
+				padding: 10px 12px;
+				background: rgba(4, 22, 10, 0.6);
+				backdrop-filter: blur(4px);
+				border-radius: 6px;
+				margin-bottom: 4px;
+			}
+
+			.landing-panel.visible {
+				display: block;
+				animation: reveal 400ms ease-out;
+			}
+
+			.landing-title {
+				display: block;
+				font-size: 0.72rem;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--text-dim);
+				margin-bottom: 5px;
+			}
+
+			.landing-lines {
+				display: flex;
+				flex-direction: column;
+				gap: 2px;
+				min-height: 84px;
+			}
+
+			.landing-line::before {
+				content: "> ";
+				color: #72f8ff;
+			}
+
+			.main-grid {
+				display: grid;
+				grid-template-columns: minmax(0, 1fr) minmax(225px, 280px);
+				gap: 12px;
+				min-height: 0;
+				flex: 1;
+			}
+
+			.terminal-card {
+				display: flex;
+				flex-direction: column;
+				min-height: 0;
+				animation: reveal 520ms ease-out;
+			}
+
+			.terminal-head {
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 12px 16px;
+				border-bottom: 1px solid rgba(141, 255, 159, 0.16);
+			}
+
+			.terminal-head .title {
+				font-family: "IBM Plex Mono", Consolas, monospace;
+				font-size: 0.95rem;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: #b8ffc5;
+			}
+
+			.terminal-head .hint {
+				font-size: 0.73rem;
+				color: var(--text-dim);
+			}
+
 			#terminal {
 				flex: 1;
 				overflow: auto;
+				min-height: 0;
+				padding: 16px;
 				white-space: pre-wrap;
-				word-break: break-word; /* allow long words/URLs to wrap */
-				/* Make the scrollbar visually match the terminal style */
-				-ms-overflow-style: none; /* hide default scrollbar in IE/Edge (shows none but still scrollable) */
-				scrollbar-width: thin; /* Firefox: make scrollbar thin */
-				scrollbar-color: rgba(182, 243, 107, 0.14) transparent; /* Firefox: thumb and track */
+				word-break: break-word;
+				scrollbar-width: thin;
+				scrollbar-color: rgba(141, 255, 159, 0.32) transparent;
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
 			}
-			/* WebKit browsers (Chrome, Safari) custom scrollbar styling */
+
+			#terminal .line {
+				line-height: 1.55;
+				animation: fadeLine 250ms ease-out;
+			}
+
 			#terminal::-webkit-scrollbar {
 				width: 10px;
 				height: 10px;
 			}
+
 			#terminal::-webkit-scrollbar-track {
 				background: transparent;
 			}
+
 			#terminal::-webkit-scrollbar-thumb {
-				background: rgba(182, 243, 107, 0.12);
+				background: rgba(141, 255, 159, 0.24);
 				border-radius: 8px;
-				border: 1px solid rgba(0, 0, 0, 0.55);
+				border: 1px solid rgba(3, 14, 8, 0.7);
 			}
+
 			#terminal::-webkit-scrollbar-thumb:hover {
-				background: rgba(182, 243, 107, 0.2);
+				background: rgba(141, 255, 159, 0.38);
 			}
+
+			.message-group {
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				padding: 6px 0 8px;
+				border-bottom: 1px dashed rgba(141, 255, 159, 0.14);
+			}
+
+			.message-group:last-child {
+				border-bottom: 0;
+			}
+
+			.message-group-header {
+				display: flex;
+				align-items: center;
+				flex-wrap: wrap;
+				gap: 2px;
+			}
+
+			.message-group-body {
+				display: flex;
+				flex-direction: column;
+				gap: 2px;
+			}
+
+			.message-entry {
+				max-width: min(100%, 84ch);
+				padding: 1px 0;
+				color: var(--text-main);
+			}
+
+			.message-group.own .message-entry::before {
+				content: "| ";
+				color: rgba(114, 248, 255, 0.85);
+			}
+
+			.message-group:not(.own) .message-entry::before {
+				content: ": ";
+				color: rgba(141, 255, 159, 0.65);
+			}
+
 			#users-panel {
-				position: absolute;
-				top: 12px;
-				right: 12px;
-				background: rgba(0, 0, 0, 0.6);
-				border: 1px solid #333;
-				color: #b6f36b;
-				padding: 8px;
-				font-family: inherit;
-				font-size: 13px;
-				max-width: 240px;
-				max-height: 60vh;
+				padding: 14px;
 				overflow: auto;
-				/* match terminal scrollbar appearance */
-				-ms-overflow-style: none;
 				scrollbar-width: thin;
-				scrollbar-color: rgba(182, 243, 107, 0.12) transparent;
-				box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+				scrollbar-color: rgba(141, 255, 159, 0.28) transparent;
+				animation: reveal 620ms ease-out;
 			}
+
 			#users-panel::-webkit-scrollbar {
 				width: 8px;
 				height: 8px;
 			}
+
 			#users-panel::-webkit-scrollbar-track {
 				background: transparent;
 			}
+
 			#users-panel::-webkit-scrollbar-thumb {
-				background: rgba(182, 243, 107, 0.12);
+				background: rgba(141, 255, 159, 0.24);
 				border-radius: 6px;
-				border: 1px solid rgba(0, 0, 0, 0.55);
+				border: 1px solid rgba(3, 14, 8, 0.7);
 			}
+
 			#users-panel h4 {
-				margin: 0 0 6px 0;
-				font-size: 12px;
-				color: #6ef;
+				margin: 0 0 10px 0;
+				font-family: "IBM Plex Mono", Consolas, monospace;
+				font-size: 0.86rem;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+				color: #b8ffc5;
 			}
+
 			#users-panel ul {
 				list-style: none;
 				padding: 0;
 				margin: 0;
 			}
+
 			#users-panel li {
-				padding: 2px 0;
-				border-bottom: 1px dashed rgba(255, 255, 255, 0.03);
-				font-size: 12px;
+				padding: 8px 2px;
+				border-bottom: 1px solid rgba(141, 255, 159, 0.12);
+				font-size: 0.82rem;
 			}
+
 			.input-row {
 				display: flex;
+				align-items: center;
 				gap: 8px;
-				margin-top: 8px;
+				padding: 12px 16px;
+				border-top: 1px solid rgba(141, 255, 159, 0.16);
 			}
+
 			#prompt {
 				display: none;
 				min-width: 0;
-				color: #6ef;
+				color: #89f2ff;
+				font-size: 0.84rem;
 			}
-			/* distinct style when asking for display name */
+
 			#prompt.name-mode {
 				display: inline-block;
-				background: #071;
-				border: 1px solid #264;
-				color: #b6f36b;
-				padding: 4px 8px;
-				border-radius: 4px;
+				background: rgba(26, 56, 21, 0.62);
+				border: 1px solid rgba(200, 255, 138, 0.45);
+				color: var(--accent-lime);
+				padding: 6px 10px;
+				border-radius: 8px;
 				font-weight: 700;
 			}
 
-			/* quote shown at the top while entering display name */
-			.name-quote-top {
-				display: none;
-				position: absolute;
-				top: 18px;
-				left: 18px; /* align left per request */
-				transform: none;
-				max-width: calc(100% - 36px);
-				color: #9ad0ff;
-				font-style: italic;
-				font-size: 15px;
-				border-left: 4px solid rgba(106, 192, 255, 0.18);
-				padding-left: 12px;
-				padding-top: 6px;
-				padding-bottom: 6px;
-				background: rgba(0, 0, 0, 0.35);
-				backdrop-filter: blur(2px);
-				border-radius: 6px;
-				z-index: 20;
-			}
-
-			/* visible when prompt is in name-mode */
-			.name-quote-top.visible {
-				display: block;
-			}
-
-			/* input appearance when entering name to make it clearly different */
-			#cmd.name-input {
-				background: #011;
-				border: 1px solid #234;
-				color: #b6f36b;
-				font-weight: 600;
-			}
 			#cmd {
 				flex: 1;
-				background: #000;
-				border: 1px solid #333;
+				background: rgba(2, 14, 8, 0.8);
+				border: 1px solid rgba(141, 255, 159, 0.34);
+				border-radius: 11px;
 				color: inherit;
-				padding: 6px;
+				padding: 10px 12px;
 				font-family: inherit;
-				font-size: 14px;
+				font-size: 0.9rem;
+				transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
 			}
-			.meta {
-				color: #888;
-				font-size: 12px;
+
+			#cmd:focus {
+				outline: none;
+				border-color: rgba(141, 255, 159, 0.86);
+				box-shadow: 0 0 0 3px rgba(141, 255, 159, 0.18);
+				transform: translateY(-1px);
 			}
-			/* notification text (join/leave) */
-			.notice {
-				color: #777; /* slightly dimmer gray for notifications */
-				font-style: italic;
-			}
-			.meta.rate {
-				color: #f66; /* red-ish */
+
+			#cmd.name-input {
+				background: rgba(13, 30, 13, 0.75);
+				border: 1px solid rgba(200, 255, 138, 0.34);
+				color: var(--accent-lime);
 				font-weight: 600;
 			}
+
+			.meta {
+				color: var(--text-dim);
+				font-size: 0.78rem;
+			}
+
+			.notice {
+				color: #7ea88a;
+				font-style: italic;
+			}
+
+			.meta.rate {
+				color: #ff8888;
+				font-weight: 600;
+			}
+
 			.line .from {
-				color: #6ef;
+				color: #89f2ff;
 				white-space: nowrap;
 			}
+
 			.line .ip {
-				color: #8fb;
+				color: #86b193;
 				margin-left: 6px;
-				font-size: 12px;
+				font-size: 0.78rem;
 			}
+
 			.line .time {
-				color: #777;
+				color: #65896f;
 				margin-left: 6px;
-				font-size: 12px;
+				font-size: 0.75rem;
+			}
+
+			@keyframes reveal {
+				from {
+					opacity: 0;
+					transform: translateY(8px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			@keyframes fadeLine {
+				from {
+					opacity: 0;
+					transform: translateY(4px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			@keyframes pulse {
+				0% {
+					box-shadow: 0 0 0 0 rgba(200, 255, 138, 0.55);
+				}
+				70% {
+					box-shadow: 0 0 0 12px rgba(200, 255, 138, 0);
+				}
+				100% {
+					box-shadow: 0 0 0 0 rgba(200, 255, 138, 0);
+				}
+			}
+
+			@media (max-width: 860px) {
+				.main-grid {
+					grid-template-columns: 1fr;
+					grid-template-rows: minmax(0, 1fr) auto;
+				}
+
+				#users-panel {
+					max-height: 30vh;
+				}
+
+				.brand .tagline {
+					display: none;
+				}
+			}
+
+			@media (max-width: 560px) {
+				.app-shell {
+					padding: 10px;
+				}
+
+				.topbar {
+					padding: 10px 12px;
+				}
+
+				.input-row {
+					padding: 10px;
+				}
+
+				#prompt {
+					display: none;
+				}
 			}
 		</style>
 	</head>
 	<body>
-		<div class="wrap">
-			<!-- quote shown when entering display name (top of UI) -->
-			<div id="name-quote-top" class="name-quote-top" aria-hidden="true"></div>
-			<div id="terminal"></div>
-			<!-- users panel: small, terminal-styled list of online users -->
-			<div id="users-panel" aria-live="polite"></div>
-			<div class="input-row">
-				<div id="prompt">you@lan</div>
-				<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
+		<div class="app-shell">
+			<header class="topbar card">
+				<div class="brand">
+					<h1>NetTalk</h1>
+					<span class="tagline">LAN realtime channel</span>
+				</div>
+				<div class="connection-pill">
+					<span id="connection-dot" class="connection-dot waiting" aria-hidden="true"></span>
+					<span id="connection-text">Awaiting display name</span>
+				</div>
+			</header>
+
+			<div id="landing-panel" class="landing-panel" aria-hidden="true">
+				<span class="landing-title">Session boot</span>
+				<div id="landing-lines" class="landing-lines"></div>
+			</div>
+
+			<div class="main-grid">
+				<section class="terminal-card card">
+					<div class="terminal-head">
+						<div class="title">Live Stream</div>
+						<div class="hint">Press Enter to send</div>
+					</div>
+					<div id="terminal" aria-live="polite"></div>
+					<div class="input-row">
+						<div id="prompt">you@lan</div>
+						<input id="cmd" autocomplete="off" autofocus placeholder="Type message and press Enter" />
+					</div>
+				</section>
+
+				<aside id="users-panel" class="card" aria-live="polite"></aside>
 			</div>
 		</div>
 
 		<script>
 			const terminal = document.getElementById("terminal");
 			const cmd = document.getElementById("cmd");
+			const usersPanel = document.getElementById("users-panel");
+			const connectionDot = document.getElementById("connection-dot");
+			const connectionText = document.getElementById("connection-text");
 			let username = "";
+			let lastMessageGroup = null;
+			let landingTimer = null;
 
-			// DOM-safe helpers
+			function setConnectionStatus(state, text) {
+				if (connectionText) connectionText.textContent = text;
+				if (!connectionDot) return;
+				connectionDot.classList.remove("live", "waiting");
+				if (state === "live") connectionDot.classList.add("live");
+				else connectionDot.classList.add("waiting");
+			}
+
+			function textNode(text) {
+				return document.createTextNode(text);
+			}
+
 			function appendLineNode(children, className = "line") {
 				const div = document.createElement("div");
 				div.className = className;
@@ -220,43 +568,53 @@
 				terminal.scrollTop = terminal.scrollHeight;
 			}
 
-			// users panel helpers
-			const usersPanel = document.getElementById("users-panel");
+			function clearMessageGrouping() {
+				lastMessageGroup = null;
+			}
+
 			function renderUsersList(users) {
-				// users: array of {name, ip}
 				if (!usersPanel) return;
 				usersPanel.innerHTML = "";
+
 				const h = document.createElement("h4");
 				h.appendChild(textNode("Online users"));
 				usersPanel.appendChild(h);
+
 				const ul = document.createElement("ul");
+				if (!users.length) {
+					const empty = document.createElement("li");
+					empty.className = "meta";
+					empty.textContent = "No active users yet";
+					ul.appendChild(empty);
+				}
+
 				users.forEach((u) => {
 					const li = document.createElement("li");
 					const nameLabel = u.name || "Unknown";
-					// name span with per-user color
+
 					const nameSpan = document.createElement("span");
 					nameSpan.textContent = nameLabel;
 					nameSpan.style.color = colorForName(nameLabel);
 					li.appendChild(nameSpan);
+
 					if (u.ip) {
 						const ipEl = document.createElement("span");
 						ipEl.className = "ip";
 						ipEl.textContent = " [" + u.ip + "]";
 						li.appendChild(ipEl);
 					}
+
 					if (u.name === username) {
 						const you = document.createElement("span");
 						you.textContent = " (you)";
 						you.className = "meta";
 						li.appendChild(you);
 					}
+
 					ul.appendChild(li);
 				});
-				usersPanel.appendChild(ul);
-			}
 
-			function textNode(text) {
-				return document.createTextNode(text);
+				usersPanel.appendChild(ul);
 			}
 
 			function metaNode(text) {
@@ -270,38 +628,25 @@
 				const s = document.createElement("span");
 				s.appendChild(textNode(name));
 				s.className = "from";
-				// apply deterministic color per username for consistent display
 				s.style.color = colorForName(name);
 				return s;
 			}
 
-			// Deterministic color generator based on a simple hash of the name.
-			// Produces readable HSL colors on dark backgrounds.
 			function colorForName(name) {
-				if (!name) return "#b6f36b";
-				// djb2 hash
+				if (!name) return "#d7f3ff";
 				let hash = 5381;
 				for (let i = 0; i < name.length; i++) {
 					hash = (hash << 5) + hash + name.charCodeAt(i);
-					// keep in 32-bit range
 					hash = hash & 0xffffffff;
 				}
 				const hue = Math.abs(hash) % 360;
-				const saturation = 60; // percent
-				const lightness = 60; // percent - bright enough on dark bg
-				// use comma-separated HSL syntax for broader browser compatibility
-				return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+				return "hsl(" + hue + ", 60%, 62%)";
 			}
 
 			function messageTextNode(name, text) {
 				const span = document.createElement("span");
 				span.textContent = text;
-				// keep punctuation/meta parts slightly dimmer by using the same hue but lower lightness
-				try {
-					span.style.color = colorForName(name);
-				} catch (e) {
-					span.style.color = "#b6f36b";
-				}
+				span.style.color = colorForName(name);
 				return span;
 			}
 
@@ -315,13 +660,12 @@
 			function ipNode(ip) {
 				const s = document.createElement("span");
 				s.className = "ip";
-				// render with surrounding brackets and a leading space so it reads
-				// like: "You [192.168.1.23]"
 				s.appendChild(textNode(" [" + ip + "]"));
 				return s;
 			}
 
 			function appendMetaText(text) {
+				clearMessageGrouping();
 				appendLineNode([metaNode(text)]);
 			}
 
@@ -333,7 +677,40 @@
 			}
 
 			function appendRateNotice(text) {
+				clearMessageGrouping();
 				appendLineNode([rateNode(text)]);
+			}
+
+			function appendGroupedMessage(from, ip, text) {
+				const keyIp = ip || "";
+				const sameGroup = lastMessageGroup && lastMessageGroup.from === from && lastMessageGroup.ip === keyIp;
+
+				if (!sameGroup) {
+					const group = document.createElement("div");
+					group.className = "message-group";
+					if (from === username) group.classList.add("own");
+
+					const header = document.createElement("div");
+					header.className = "message-group-header";
+					header.appendChild(metaNode("[" + timeNow() + "] "));
+					header.appendChild(nameNode(from));
+					if (ip) header.appendChild(ipNode(ip));
+
+					const body = document.createElement("div");
+					body.className = "message-group-body";
+
+					group.appendChild(header);
+					group.appendChild(body);
+					terminal.appendChild(group);
+
+					lastMessageGroup = { from, ip: keyIp, body };
+				}
+
+				const entry = document.createElement("div");
+				entry.className = "message-entry";
+				entry.textContent = text || "";
+				lastMessageGroup.body.appendChild(entry);
+				terminal.scrollTop = terminal.scrollHeight;
 			}
 
 			function timeNow() {
@@ -341,101 +718,70 @@
 				return d.toLocaleTimeString();
 			}
 
-			// WebSocket with reconnect/backoff
 			(function () {
-				// Use an in-terminal prompt instead of browser modal prompt()
 				let awaitingName = true;
-				// show the prompt area visually and set placeholder to ask for name
 				const promptEl = document.getElementById("prompt");
-				// visually switch to name-entry mode (no literal 'enter name@lan' text)
 				promptEl.classList.add("name-mode");
 				promptEl.textContent = "";
 				cmd.classList.add("name-input");
 				cmd.placeholder = "Enter display name and press Enter";
+				setConnectionStatus("waiting", "Awaiting display name");
 				cmd.focus();
 
-				// Typing quote logic: word-by-word typing at the top
-				const quoteEl = document.getElementById("name-quote-top");
-				const quotes = ["Wake up, Neo...", "I know you're out there. I can feel you now. I know that you're afraid. You're afraid of us. You're afraid of change."];
-				let quoteIndex = 0;
-				let quoteWords = [];
-				let typingTimer = null;
-				let currentIndex = 0;
+				const landingPanelEl = document.getElementById("landing-panel");
+				const landingLinesEl = document.getElementById("landing-lines");
+				const landingScript = [
+					"Initializing local relay node...",
+					"Scanning nearby peers on LAN...",
+					"Session channel is ready.",
+					"Enter a display name to continue."
+				];
 
-				function startTyping() {
-					if (!quoteEl) return;
-					quoteEl.classList.add("visible");
-					// begin with the first quote
-					quoteIndex = 0;
-					startQuote(quoteIndex);
-				}
-
-				function startQuote(i) {
-					if (!quoteEl) return;
-					quoteEl.textContent = "";
-					quoteWords = quotes[i].split(/\s+/);
-					currentIndex = 0;
-					step();
-				}
-
-				function stopTyping() {
-					if (!quoteEl) return;
-					quoteEl.classList.remove("visible");
-					quoteEl.textContent = "";
-					if (typingTimer) {
-						clearTimeout(typingTimer);
-						typingTimer = null;
-					}
-				}
-
-				function step() {
-					if (currentIndex >= quoteWords.length) {
-						// finished current quote
-						typingTimer = null;
-						quoteIndex++;
-						if (quoteIndex < quotes.length) {
-							// pause then start next quote
-							typingTimer = setTimeout(() => startQuote(quoteIndex), 900);
-						} else {
-							// all quotes done; keep displayed until name entered
+				function startLandingPanel() {
+					if (!landingPanelEl || !landingLinesEl) return;
+					landingPanelEl.classList.add("visible");
+					landingLinesEl.innerHTML = "";
+					let index = 0;
+					landingTimer = setInterval(() => {
+						if (index >= landingScript.length) {
+							clearInterval(landingTimer);
+							landingTimer = null;
+							return;
 						}
-						return;
-					}
-					const w = quoteWords[currentIndex];
-					quoteEl.textContent += (currentIndex ? " " : "") + w;
-					currentIndex++;
-					// variable delay: slightly longer after punctuation
-					let delay = 220 + Math.floor(Math.random() * 80);
-					if (/[.!?]$/.test(w)) delay += 260;
-					typingTimer = setTimeout(step, delay);
+						const line = document.createElement("div");
+						line.className = "landing-line";
+						line.textContent = landingScript[index];
+						landingLinesEl.appendChild(line);
+						index++;
+					}, 420);
 				}
 
-				// Observe class changes on the prompt to start/stop typing
-				const obs = new MutationObserver((mutations) => {
-					for (const m of mutations) {
-						if (m.type === "attributes" && m.attributeName === "class") {
-							const has = promptEl.classList.contains("name-mode");
-							if (has) startTyping();
-							else stopTyping();
-						}
+				function stopLandingPanel() {
+					if (!landingPanelEl || !landingLinesEl) return;
+					landingPanelEl.classList.remove("visible");
+					landingLinesEl.innerHTML = "";
+					if (landingTimer) {
+						clearInterval(landingTimer);
+						landingTimer = null;
 					}
-				});
-				obs.observe(promptEl, { attributes: true });
-				// start immediately if name-mode already present
-				if (promptEl.classList.contains("name-mode")) startTyping();
+				}
+
+				startLandingPanel();
 
 				const proto = location.protocol === "https:" ? "wss" : "ws";
 				const wsUrl = proto + "://" + location.host + "/ws";
 
 				let ws = null;
 				let backoff = 1;
-				let maxBackoff = 30;
+				const maxBackoff = 30;
 
 				function connect() {
+					setConnectionStatus("waiting", "Connecting...");
 					ws = new WebSocket(wsUrl);
 
 					ws.addEventListener("open", () => {
 						appendMetaText("[connected to server]");
+						setConnectionStatus("live", "Connected");
 						backoff = 1;
 						try {
 							ws.send(JSON.stringify({ type: "join", username }));
@@ -449,64 +795,63 @@
 							const m = JSON.parse(ev.data);
 							if (m.type === "welcome") {
 								username = m.username || username;
-								document.getElementById("prompt").textContent = username + "@lan";
+								promptEl.textContent = username + "@lan";
 								return;
 							}
 							if (m.type === "users" && Array.isArray(m.users)) {
-								// update users panel with the authoritative list from server
 								renderUsersList(m.users);
 								return;
 							}
 							if (m.type === "rate_limited") {
 								const retry = m.retry_after || 1;
-								appendRateNotice(`[rate-limited] slow down \u2014 retry in ${retry}s`);
+								appendRateNotice("[rate-limited] slow down - retry in " + retry + "s");
 								return;
 							}
 							if (m.type === "too_many_logins") {
-								appendRateNotice(`[connection refused] too many connections from your IP (limit ${m.limit})`);
+								appendRateNotice("[connection refused] too many connections from your IP (limit " + m.limit + ")");
 								return;
 							}
 							if (m.type === "join") {
+								clearMessageGrouping();
 								const time = "[" + timeNow() + "] ";
 								const nodes = [metaNode(time), nameNode(m.from)];
 								if (m.ip) nodes.push(ipNode(m.ip));
 								nodes.push(noticeNode(" joined the chat"));
 								appendLineNode(nodes);
 							} else if (m.type === "leave") {
+								clearMessageGrouping();
 								const time = "[" + timeNow() + "] ";
 								const nodes = [metaNode(time), nameNode(m.from)];
 								if (m.ip) nodes.push(ipNode(m.ip));
 								nodes.push(noticeNode(" left"));
 								appendLineNode(nodes);
 							} else if (m.type === "message") {
-								const time = "[" + timeNow() + "] ";
-								// show timestamp first (like join/leave)
-								const nodes = [metaNode(time), nameNode(m.from)];
-								if (m.ip) nodes.push(ipNode(m.ip));
-								// message text should use the same color as the sender
-								nodes.push(messageTextNode(m.from, ": " + (m.text || "")));
-								appendLineNode(nodes);
+								appendGroupedMessage(m.from, m.ip, m.text || "");
 							}
 						} catch (e) {
 							console.error(e);
 						}
 					});
 
-					ws.addEventListener("close", (ev) => {
+					ws.addEventListener("close", () => {
 						appendMetaText("[disconnected]");
+						setConnectionStatus("waiting", "Connection lost");
 						scheduleReconnect();
 					});
-					ws.addEventListener("error", (ev) => {
+
+					ws.addEventListener("error", () => {
 						appendMetaText("[connection error]");
+						setConnectionStatus("waiting", "Connection error");
 					});
 				}
 
 				function scheduleReconnect() {
 					const wait = Math.min(backoff, maxBackoff);
-					appendMetaText(`[reconnecting in ${wait}s]`);
+					appendMetaText("[reconnecting in " + wait + "s]");
+					setConnectionStatus("waiting", "Reconnecting in " + wait + "s");
 					setTimeout(() => {
 						backoff = Math.min(maxBackoff, backoff * 1.8 + 1);
-						// connect() will be started after the user submits a name
+						if (!awaitingName) connect();
 					}, wait * 1000);
 				}
 
@@ -514,26 +859,27 @@
 					if (e.key !== "Enter") return;
 					const text = cmd.value.trim();
 					if (!text) return;
-					// If we're awaiting the initial name, treat this as the join name
-					if (typeof awaitingName !== "undefined" && awaitingName) {
+
+					if (awaitingName) {
 						username = text || "You";
-						// remove name-entry visual mode and show normal prompt
 						promptEl.classList.remove("name-mode");
+						stopLandingPanel();
 						promptEl.textContent = username + "@lan";
 						cmd.classList.remove("name-input");
 						cmd.placeholder = "Type message and press Enter";
 						cmd.value = "";
 						awaitingName = false;
-						// now start the websocket connection
+						setConnectionStatus("waiting", "Connecting...");
 						connect();
 						return;
 					}
-					// Normal message send flow
+
 					try {
 						if (ws && ws.readyState === WebSocket.OPEN) {
 							ws.send(JSON.stringify({ type: "message", text }));
 						} else {
 							appendRateNotice("[offline] message queued temporarily");
+							setConnectionStatus("waiting", "Offline");
 						}
 					} catch (err) {
 						console.error("send failed", err);
